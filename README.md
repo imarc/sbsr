@@ -24,16 +24,22 @@ Become the user:
 su - deploy
 ```
 
-Install deployer:
-
-```bash
-composer global require deployer/deployer
-```
-
 Clone SBSR:
 
 ```bash
 git clone https://github.com/imarc/sbsr.git
+```
+
+Enter directory:
+
+```bash
+cd sbsr
+```
+
+Install Deployer and Dependencies:
+
+```
+composer install
 ```
 
 Exit to return to root:
