@@ -1,0 +1,554 @@
+<?php
+
+namespace Deployer;
+
+use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Input\InputArgument;
+
+//
+// Extended Config
+//
+
+if (file_exists("deploy.yml")) {
+	set("config", Yaml::parseFile("deploy.yml"));
+} else {
+	set("config", []);
+}
+
+//
+// Options
+//
+
+option("force",    "F", InputOption::VALUE_NONE,     "Force deployment");
+option("source",   "S", InputOption::VALUE_REQUIRED, "Set the database/sync source");
+option("revision", "R", InputOption::VALUE_REQUIRED, "Set the branch/tag/commit/revision");
+option("output",   "O", InputOption::VALUE_REQUIRED, "Output path for export commands");
+option("input",    "I", InputOption::VALUE_REQUIRED, "Input path for import commands");
+
+//
+// Use hosts inventory if exists
+//
+
+if (file_exists("hosts.yml")) {
+	inventory("hosts.yml");
+
+} else {
+	if (!empty(get("config")["stages"])) {
+		$stages = get("config")["stages"];
+	} else {
+		$stages = ["dev", "uat", "prod"];
+	}
+
+	foreach ($stages as $stage) {
+		localhost("local" . $stage)
+			->stage($stage)
+			->roles(["web", "files", "data"])
+		;
+	}
+}
+
+//
+// Initialization
+//
+
+set("env", get("config")["env"] ?? []);
+
+set("stage", function() {
+	return input()->getArgument("stage");
+});
+
+set("options", function() {
+	return array_merge(
+		get("config")["options"] ?? array(),
+		get("config")[parse("options-{{ stage }}")] ?? array()
+	);
+});
+
+//
+// Runtime
+//
+
+set("cwd", function() {
+	return getcwd();
+});
+
+set("pid", function() {
+	return getmypid();
+});
+
+set("self", function() {
+	return $_SERVER["argv"][0] . (
+		input()->hasOption("file")
+			? sprintf(" --file=\"%s\" ", input()->getOption("file"))
+			: NULL
+	);
+});
+
+//
+// Paths
+//
+
+set("cachePath",   "{{ cwd }}/cache");
+set("sharesPath",  "{{ cwd }}/shares");
+set("stagesPath",  "{{ cwd }}/stages");
+set("releasePath", "{{ cwd }}/releases");
+
+set("tmpPath", function() {
+	return sys_get_temp_dir();
+});
+
+//
+// VCS Settings
+//
+
+set("vcsType", function() {
+	return parse(get("config")["vcs"]["type"] ?? "git");
+});
+
+set("vcsPath", function() {
+	return parse(get("config")["vcs"]["path"] ?? NULL);
+});
+
+//
+// DB Settings
+//
+
+set("dbType", function() {
+	return parse(get("config")["db"]["type"] ?? "pgsql");
+});
+
+set("dbName", function() {
+	return parse(get("config")["db"]["name"] ?? NULL);
+});
+
+set("dbUser", function() {
+	return parse(get("config")["db"]["user"] ?? NULL);
+});
+
+set("dbRole", function() {
+	return parse(get("config")["db"]["role"] ?? "web");
+});
+
+set("dbPass", function() {
+	return parse(get("config")["db"]["pass"] ?? NULL);
+});
+
+//
+// Programs
+//
+
+set("php", function() {
+	return locateBinaryPath("php");
+});
+
+set("vcs", function() {
+	switch(get("vcsType")) {
+		case "git":
+			return locateBinaryPath("git");
+
+		default:
+			writeln("<error>Unsupported VCS {{ vcsType }}</error>");
+			exit(2);
+	}
+});
+
+set("db", function() {
+	switch(get("dbType")) {
+		case "pgsql":
+			return sprintf("%s -U %s", locateBinaryPath("psql"), get("dbUser") ?: "postgres");
+		default:
+			writeln("<error>Unsupported DB {{ dbType }}</error>");
+			exit(2);
+	}
+});
+
+set("db_dump", function() {
+	switch(get("dbType")) {
+		case "pgsql":
+			return sprintf("%s -U %s", locateBinaryPath("pg_dump"), get("dbUser") ?: "postgres");
+	}
+});
+
+//
+// Context
+//
+
+set("branch", function() {
+	switch(get("vcsType")) {
+		case "git":
+			return get("options")["branch"] ?? "master";
+	}
+});
+
+set("revision", function() {
+	return input()->getOption("revision") ?: get("branch");
+});
+
+set("commit", function() {
+	switch (get("vcsType")) {
+		case "git":
+			$rev  = get("revision");
+			$refs = run("{{ vcs }} ls-remote {{ vcsPath }}");
+
+			foreach (explode("\n", $refs) as $ref) {
+				list($commit, $head) = explode("\t", $ref);
+
+				if ($head == "refs/heads/$rev") {
+					$rev = $commit;
+					break;
+				}
+			}
+
+			return $rev;
+	}
+});
+
+set("source", function() {
+	if (input()->getOption("source")) {
+		return input()->getOption("source");
+	} elseif (!empty(get("options")["source"])) {
+		return get("options")["source"];
+	} else {
+		return "prod";
+	}
+});
+
+set("release", "{{ stage }}/{{ commit }}");
+
+//
+// Setup Tasks
+//
+
+task("setup", [
+	"setup:cache",
+	"setup:releases",
+	"setup:shares",
+	"setup:stages",
+]);
+
+task("setup:cache", function() {
+	switch(get("vcsType")) {
+		case "git":
+			if (!file_exists(parse("{{ cachePath }}/HEAD"))) {
+				run("{{ vcs }} clone --bare {{ vcsPath }} {{ cachePath }}");
+			}
+			break;
+	}
+})->onRoles("files");
+
+task("setup:releases", function() {
+	if (!file_exists(parse("{{ releasePath }}/{{ stage }}"))) {
+		run("mkdir -p {{ releasePath }}/{{ stage }}");
+	}
+})->onRoles("files");
+
+task("setup:shares", function() {
+	if (!file_exists(parse("{{ sharesPath }}/{{ stage }}"))) {
+		run("mkdir -p {{ sharesPath }}/{{ stage }}");
+	}
+})->onRoles("files");
+
+task("setup:stages", function() {
+	if (!file_exists(get("stagesPath"))) {
+		run("mkdir {{ stagesPath }}");
+	}
+})->onRoles("web");
+
+/***************************************************************************************************
+ ** Deployment Tasks
+ **************************************************************************************************/
+
+task("to", [
+	"test",
+	"prepare",
+	"share",
+	"build",
+	"sync",
+	"release"
+]);
+
+//
+// Test the current stage link on web to see if the requested revision is already deployed.
+//
+
+task("test", function() {
+	if (test("readlink {{ stagesPath }}/{{ stage }}")) {
+		$current_release = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
+
+		if ($current_release == parse("{{ commit }}") && !input()->getOption("force")) {
+			writeln("<error>Commit {{ commit }} is already deployed on {{ stage }}, use -F to force.</error>");
+			exit(2);
+		}
+	}
+})->onRoles("web");
+
+//
+//
+//
+
+task("prepare", function() {
+	if (!file_exists(parse("{{ releasePath }}/{{ release }}"))) {
+			run("mkdir -p {{ releasePath }}/{{ release }}");
+	}
+
+	within("{{ cachePath }}", function() {
+		switch(get("vcsType")) {
+			case "git":
+				run("{{ vcs }} fetch");
+
+				if (run("{{ vcs }} cat-file -t {{ commit }}") != "commit") {
+					writeln("<error>Invalid revision \"{{ revision }}\" specified</error>");
+					exit(1);
+				}
+
+				run("{{ vcs }} archive {{ commit }} | tar -x --directory {{ releasePath }}/{{ release }}");
+				break;
+		}
+	});
+})->onRoles("files");
+
+//
+//
+//
+
+task("share", function() {
+	$shares_path  = parse("{{ sharesPath }}/{{ stage }}");
+	$path_parts   = explode("/", parse("{{ releasePath }}/{{ release }}"));
+	$link_root    = NULL;
+
+	while (strpos($shares_path, implode("/", $path_parts) . "/") !== 0) {
+		array_pop($path_parts);
+		$link_root .= "../";
+	}
+
+	$link_root .= str_replace(implode("/", $path_parts) . "/", "", $shares_path);
+	$link_paths = array_unique(array_merge(
+		get("config")["share"] ?? array(),
+		get("config")[parse("share-{{ stage }}")] ?? array()
+	));
+
+	within("{{ releasePath }}/{{ release }}", function() use ($link_root, $link_paths) {
+		foreach ($link_paths as $path) {
+			run("rm -rf $path");
+			run("ln -s $link_root/$path $path");
+		}
+	});
+})->onRoles("files");
+
+//
+//
+//
+
+task("build", function() {
+	within("{{ releasePath }}/{{ release }}", function() {
+		$commands = array_unique(array_merge(
+			get("config")["build"] ?? array(),
+			get("config")[parse("build-{{ stage }}")] ?? array()
+		));
+
+		foreach ($commands as $command) {
+			run($command, ["tty" => TRUE]);
+		}
+	});
+})->onRoles("files");
+
+//
+// The sync task is responsible for syncing share data from the source stage to the
+// deployment stage.  Depending on whether or not the path is a file or folder in the
+// source share, this will either `cp` or `rsync`.
+//
+
+task("sync", function() {
+	if (get("stage") == get("source")) {
+		return;
+	}
+
+	runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}");
+	runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}");
+
+	within("{{ sharesPath }}", function() {
+		$paths = array_unique(array_merge(
+			get("config")["sync"] ?? array(),
+			get("config")[parse("sync-{{ stage }}")] ?? array()
+		));
+
+		foreach ($paths as $path) {
+			if (!dirname($path) != ".") {
+				run("mkdir -p {{ stage }}/" . dirname($path));
+			}
+
+			if (is_dir(parse("{{ sharesPath }}/{{ source }}/$path"))) {
+				run("rsync -a {{ source }}/$path {{ stage }}/");
+
+			} elseif (is_file(parse("{{ sharesPath }}/{{ source }}/$path"))) {
+				run("cp {{ source }}/$path {{ stage }}/$path");
+
+			} else {
+				writeln("<error>Could not sync $path from {{ source }}, file or directory does not exist.</error>");
+				exit(3);
+			}
+		}
+	});
+})->onRoles("files");
+
+//
+// The launch task is responsible for linking the webdocs for the deployment stage to the
+// release.
+//
+
+task("release", function() {
+	//
+	// Run migrations
+	//
+
+	within("{{ releasePath }}/{{ release }}", function() {
+		if (test("{{ php }} vendor/bin/phinx status")) {
+			if (get("stage") != get("source")) {
+				run("{{ php }} vendor/bin/phinx migrate -c -e new");
+			} else {
+				run("{{ php }} vendor/bin/phinx migrate -c -e current");
+			}
+		}
+	});
+
+	//
+	//
+	//
+
+	$release_path = parse("{{ releasePath }}/{{ release }}");
+	$path_parts   = explode("/", parse("{{ stagesPath }}"));
+	$link_root    = NULL;
+
+	while (strpos($release_path, implode("/", $path_parts) . "/") !== 0) {
+		array_pop($path_parts);
+		$link_root .= "../";
+	}
+
+	$link_root .= str_replace(implode("/", $path_parts) . "/", "", $release_path);
+
+	run("ln -fsn $link_root {{ stagesPath }}/{{ stage }}");
+	runLocally("{{ self }} db:rollout {{ stage }}");
+
+	//
+	// Run release commands
+	//
+
+	within("{{ stagesPath }}/{{ stage }}", function() {
+		$commands = array_unique(array_merge(
+			get("config")["release"] ?? array(),
+			get("config")[parse("release-{{ stage }}")] ?? array()
+		));
+
+		foreach ($commands as $command) {
+			run($command, ["tty" => TRUE]);
+		}
+	});
+})->onRoles("web");
+
+
+/***************************************************************************************************
+ ** Database Tasks
+ **************************************************************************************************/
+
+//
+//
+//
+
+task("db:create", function() {
+	switch(get("dbType")) {
+		case "pgsql":
+			if (!run("{{ db }} -l | grep {{ stage }}_{{ dbName }}_new | wc -l")) {
+				return run("{{ db }} -c \"CREATE DATABASE {{ stage }}_{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
+			}
+	}
+
+	//
+	// TODO: Throw error that new database still exists
+	//
+})->onRoles("data");
+
+//
+//
+//
+
+task("db:export", function() {
+	if (!input()->hasOption("output")) {
+		exit(2);
+	}
+
+	$file = input()->getOption("output");
+
+	run("{{ db_dump }} {{ stage }}_{{ dbName }} > $file");
+
+	//
+	// If the file was not exported locally, it won"t exist and we"ll have to download
+	// it then remove it from the remote server.
+	//
+
+	if (!file_exists($file)) {
+		download($file, $file);
+		run("rm $file");
+	}
+})->onRoles("data");
+
+//
+//
+//
+
+task("db:import", function() {
+	if (!input()->hasOption("input")) {
+		exit(2);
+	}
+
+	if (!file_exists($file = input()->getOption("input"))) {
+		exit(2);
+	}
+
+	runLocally("{{ self }} db:create {{ stage }}");
+
+	upload($file, $file);
+	run("cat $file | {{ db }} {{ stage }}_{{ dbName }}_new");
+	run("rm $file");
+
+	//
+	// If the file still exists then it was uploaded and imported remotely, so we still want
+	// to remove it locally.
+	//
+
+	if (file_exists($file)) {
+		runLocally("rm $file");
+	}
+})->onRoles("data");
+
+//
+//
+//
+
+task("db:rollout", function() {
+	switch(get("dbType")) {
+		case "pgsql":
+			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new");
+			$has_old_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_old");
+			$has_cur_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}");
+
+			if (!$has_new_db) {
+				break;
+			}
+
+			if ($has_cur_db) {
+				if ($has_old_db) {
+					run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_old\" postgres");
+				}
+
+				run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }} RENAME to {{ stage }}_{{ dbName }}_old\" postgres");
+			}
+
+			run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }}_new RENAME to {{ stage }}_{{ dbName }}\" postgres");
+			return TRUE;
+	}
+
+	//
+	// TODO:  throw error that there is no new DB to roll out
+	//
+})->onRoles("data");

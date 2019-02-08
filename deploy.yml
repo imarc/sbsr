@@ -1,0 +1,75 @@
+#
+# Key: `stages` (optional)
+#
+# The `stages` list contains a complete list of valid staging environments.  Defaults are dev, uat,
+# prod.  If this configuration is removed you will need to add it back to enable additional stages.
+#
+
+stages:
+  - dev
+  - uat
+  - prod
+
+#
+# Key: `vcs` (required)
+#
+# Defined settings for the version control system.  Currently only `git` is supported for the
+# type.  The path can be any valid `git` URL -- you will need to ensure your deployment user can
+# pull from the repo.
+#
+
+vcs:
+  type: git
+  path: git@github.com:symfony/demo.git
+
+#
+# Key: `db` (required)
+#
+# Define database settings for creating, exporting, and importing databases.
+#
+
+db:
+  # Key: `type` (required) the type of database, e.g. `pgsql`, `mysql`
+  type: pgsql
+
+  # Key: `name` (required) the base name of the database, full database names will include stage
+  # name and status, e.g. `dev_nmscpa_org`, `dev_nmscpa_org_old`
+  name: nmscpa_org
+
+  # Key: `role` (optional) the user role which owns newly created databases.  This should be equal
+  # to the database user that connects from the application.  Defaults to `web` if undefined.
+  role: web
+
+  # Key: `user` (optional) the user role which can connect and manage databases.  This will default
+  # to the default "root database user" for the database type if undefined.
+  user: postgres
+
+  # Key: `pass` (optional) the password for the `user`.
+  pass:
+
+#
+# Define environment variables for operations.
+#
+# Environment variables can be added in simple key pairs, e.g. `OPUS_DISABLED: 1`
+#
+
+env:
+
+options:
+  source: prod
+  branch: master
+
+share:
+  - .env
+  - writable
+
+build:
+  - npm install
+  - gulp build
+  - composer install
+
+sync:
+  - writable
+
+release:
+  - sudo service php7.3-fpm restart
