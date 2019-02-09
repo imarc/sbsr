@@ -2,11 +2,13 @@
 
 ROOT=$(dirname "$(readlink -f "$0")")
 USER=$(stat -c "%U" $ROOT)
-EXEC="$ROOT/vendor/bin/dep"
-CONF="$ROOT/deploy.php"
+
+DCMD="$ROOT/vendor/bin/dep"
+EXEC="$ROOT/deploy.php"
+CONF="$ROOT/deploy.yml"
 
 if [[ `whoami` != $USER ]]; then
-        sudo -u $USER $EXEC --file=$CONF  "$@"
+	sudo -u $USER $DCMD --file=$EXEC  "$@"
 else
-        $EXEC --file=$CONF  "$@"
+	$DCMD --file=$EXEC "$@"
 fi

@@ -48,15 +48,32 @@ db:
   pass:
 
 #
-# Define environment variables for operations.
+# Key: 'env` (optional)
 #
-# Environment variables can be added in simple key pairs, e.g. `OPUS_DISABLED: 1`
+# A list of environment variables and their values.  These variables will be set on the environment,
+# before any code execution and can be used to adjust behavior of supporting commands, e.g.
+# `OPUS_DISABLED: 1`.
 #
 
 env:
+  EXAMPLE_VAR: 1
+
+#
+# Key: `options` (optional)
+#
+# A list of deployment options and their values.  You can overload options on a particular stage
+# by adding addtional `options` secitons suffixed by `-<stage>`.  For example, if you want to change
+# the default branch on `uat` stage, you can do:
+#
+# options-uat:
+#   branch: testing
+#
 
 options:
+  # Key: `source` (optional) the stage which data/files are synced to upon deploy, default is `prod`
   source: prod
+
+  # Key: `branch` (optional) is the branch to deploy, default varies on vcs type, `master` for `git`
   branch: master
 
 share:
