@@ -284,7 +284,6 @@ task("vcs:checkout", function() {
 })->onRoles("files");
 
 
-ta
 
 
 //
