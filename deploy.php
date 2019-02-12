@@ -224,11 +224,15 @@ set("source", function() {
 set("release", "{{ stage }}/{{ commit }}");
 
 set("current", function($result = NULL) {
-	on(roles('web'), function() use (&$result) {
-		if (test("[ $(readlink {{ stagesPath }}/{{ stage }}) ]")) {
-			$result = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
+	foreach (roles('web') as $host) {
+		if ($host->get('stage', get('stage'))) {
+			on($host, function() use (&$result) {
+				if (test("[ $(readlink {{ stagesPath }}/{{ stage }}) ]")) {
+					$result = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
+				}
+			});
 		}
-	});
+	}
 
 	return $result;
 });
@@ -309,7 +313,14 @@ task("vcs:diff", function() {
 	within("{{ cachePath }}", function() {
 		switch(get("vcsType")) {
 			case "git":
-				return writeln(run("{{ vcs }} log {{ current }}...{{ commit }}"));
+				$diff = run("{{ vcs }} log {{ current }}...{{ commit }}");
+				break;
+		}
+
+		if (!trim($diff)) {
+			writeln("<info>There are no changes between the deployed and requested revision.</info>");
+		} else {
+			writeln($diff);
 		}
 	});
 })->onRoles("files");
