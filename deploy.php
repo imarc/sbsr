@@ -552,8 +552,13 @@ task("sync", function() {
 		return;
 	}
 
-	runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}");
-	runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}");
+	if (input()->getOption('force')) {
+		runLocally("{{ self }} db:export -F -O {{ source }}_{{ dbName }}.sql {{ source }}");
+		runLocally("{{ self }} db:import -F -I {{ source }}_{{ dbName }}.sql {{ stage }}");
+	} else {
+		runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}");
+		runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}");		
+	}
 
 	within("{{ sharesPath }}", function() {
 		$paths = array_unique(array_merge(
