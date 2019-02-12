@@ -102,6 +102,10 @@ Usually you will begin by setting up the production environment:
 dep setup prod
 ```
 
+This will create the requisite stage directories for `prod` and copy out any shares that exist in
+your version control repository to the shares directory for the stage.  If you have additional
+shares which are not part of the repository, you will need to create them manually.
+
 ### Deployment
 
 Deploying to a stage:
@@ -119,15 +123,23 @@ which:
 dep db:create <stage>
 ```
 
-You can now run whatever manual operations you need to on the database.  Once completed, you can
-roll out your new database with:
+You can now run whatever manual operations you need to on the database.  If you make a mistake you
+can drop the new database:
+
+```bash
+dep db:drop <stage>
+```
+> Note: that this will only drop the new database.  Once a database is rolled out, there's no way
+using SBSR to remove it.  You can only ever roll out a new database in its place.
+
+If all your operations were run successfully, you can roll out the new database to the current:
 
 ```bash
 dep db:rollout <stage>
 ```
 
-This will move `<stage>_<db.name>`, if it exists, to `<stage>_<db.name>_old` and move the new
-`<stage>_<db.name>_new` to `<stage>_<db.name>`, basically cycling the databases.
+> Note: This will move `<stage>_<db.name>`, if it exists, to `<stage>_<db.name>_old` and move the
+new `<stage>_<db.name>_new` to `<stage>_<db.name>`, basically cycling the databases.
 
 If you want to import a database you can execute the following:
 

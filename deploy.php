@@ -85,7 +85,7 @@ set("self", function() {
 				: NULL
 		)
 		. (
-			input()->hasOption("force")
+			input()->getOption("force")
 				? sprintf(" -F ")
 				: NULL
 		)
@@ -371,7 +371,7 @@ task("db:drop", function() {
 
 task("db:create", function() {
 	if (input()->getOption('force')) {
-		runLocally("{{ self }} db:drop {{ stage }}");
+		invoke("db:drop");
 	}
 
 	switch(get("dbType")) {
@@ -415,14 +415,16 @@ task("db:export", function() {
 
 task("db:import", function() {
 	if (!input()->hasOption("input")) {
+		writeln("<error>Unable to import database, no input sql specified, use -I.</error>");
 		exit(2);
 	}
 
 	if (!file_exists($file = input()->getOption("input"))) {
+		writeln("<error>Unable to import database, specified input sql does not exist.</error>");
 		exit(2);
 	}
 
-	runLocally("{{ self }} db:create {{ stage }}");
+	invoke("db:create");
 
 	upload($file, $file);
 	run("cat $file | {{ db }} {{ stage }}_{{ dbName }}_new");
