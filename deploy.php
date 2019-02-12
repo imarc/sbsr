@@ -293,7 +293,7 @@ task("test:setup", function() {
 //
 
 task("vcs:checkout", function() {
-	if (!file_exists(parse("{{ releasePath }}/{{ release }}"))) { // TODO: This won't work like we think
+	if (test("[ -ne {{ releasePath }}/{{ release }} ]")) {
 			run("mkdir -p {{ releasePath }}/{{ release }}");
 	}
 
@@ -356,24 +356,33 @@ task("vcs:persist", function() {
 //
 //
 
-task("db:create", function() {
+task("db:drop", function() {
 	switch(get("dbType")) {
 		case "pgsql":
 			if (test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
-				if (!input()->getOption("force")) {
-					writeln("<error>Database {{ stage }}_{{ dbName }}_new already exists, use -F to force.</error>");
-					exit(2);
-				}
-
-				run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_new\" postgres");
+				return run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_new\" postgres");
 			}
+	}
+})->onRoles("data");
 
-			return run("{{ db }} -c \"CREATE DATABASE {{ stage }}_{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
+//
+//
+//
+
+task("db:create", function() {
+	if (input()->getOption('force')) {
+		runLocally("{{ self }} db:drop {{ stage }}");
 	}
 
-	//
-	// TODO: Throw error that new database still exists
-	//
+	switch(get("dbType")) {
+		case "pgsql":
+			if (!test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
+				return run("{{ db }} -c \"CREATE DATABASE {{ stage }}_{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
+			}
+	}
+
+	writeln("<error>Database {{ stage }}_{{ dbName }}_new already exists, use -F to force.</error>");
+	exit(2);
 })->onRoles("data");
 
 //
@@ -394,9 +403,9 @@ task("db:export", function() {
 	// it then remove it from the remote server.
 	//
 
-	if (!file_exists($file)) { // TODO: This won't work like we think
-		download($file, $file);
-		run("rm $file");
+	if (!file_exists($file)) {  // Check if file exists locally
+		download($file, $file); // Download the file from the remote
+		run("rm $file");        // Remove the file remotely
 	}
 })->onRoles("data");
 
@@ -409,7 +418,7 @@ task("db:import", function() {
 		exit(2);
 	}
 
-	if (!file_exists($file = input()->getOption("input"))) { // TODO: This won't work like we think
+	if (!file_exists($file = input()->getOption("input"))) {
 		exit(2);
 	}
 
@@ -424,7 +433,7 @@ task("db:import", function() {
 	// to remove it locally.
 	//
 
-	if (file_exists($file)) { // TODO: This won't work like we think
+	if (file_exists($file)) {
 		runLocally("rm $file");
 	}
 })->onRoles("data");
@@ -479,7 +488,7 @@ task("setup", [
 task("setup:cache", function() {
 	switch(get("vcsType")) {
 		case "git":
-			if (!file_exists(parse("{{ cachePath }}/HEAD"))) { // TODO: This won't work like we think
+			if (test("[ -ne {{ cachePath }}/HEAD ]")) {
 				run("{{ vcs }} clone --bare {{ vcsPath }} {{ cachePath }}");
 			}
 			break;
@@ -487,19 +496,19 @@ task("setup:cache", function() {
 })->onRoles("files");
 
 task("setup:releases", function() {
-	if (!file_exists(parse("{{ releasePath }}/{{ stage }}"))) { // TODO: This won't work like we think
+	if (test("[ -ne {{ releasePath }}/{{ stage }} ]")) {
 		run("mkdir -p {{ releasePath }}/{{ stage }}");
 	}
 })->onRoles("files");
 
 task("setup:shares", function() {
-	if (!file_exists(parse("{{ sharesPath }}/{{ stage }}"))) { // TODO: This won't work like we think
+	if (test("[ -ne {{ sharesPath }}/{{ stage }} ]")) {
 		run("mkdir -p {{ sharesPath }}/{{ stage }}");
 	}
 })->onRoles("files");
 
 task("setup:stages", function() {
-	if (!file_exists(get("stagesPath"))) { // TODO: This won't work like we think
+	if (test("[ -ne {{ stagesPath }} ]")) {
 		run("mkdir {{ stagesPath }}");
 	}
 })->onRoles("web");
