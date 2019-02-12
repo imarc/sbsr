@@ -217,14 +217,14 @@ set("source", function() {
 set("release", "{{ stage }}/{{ commit }}");
 
 /***************************************************************************************************
- ** Test Tasks
- **************************************************************************************************/
- //
- // Test whether or not the staged release already matches the revision.  We will only re-deploy
- // the same revision if -F is provided to force rebuild, resync, etc.
- //
+** Test Tasks
+**************************************************************************************************/
+//
+// Test whether or not the staged release already matches the revision.  We will only re-deploy
+// the same revision if -F is provided to force rebuild, resync, etc.
+//
 
- task("test:release", function() {
+task("test:release", function() {
 	if (test("readlink {{ stagesPath }}/{{ stage }}")) {
 		$current_release = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
 
@@ -233,13 +233,13 @@ set("release", "{{ stage }}/{{ commit }}");
 			exit(2);
 		}
 	}
- })->onRoles("web");
+})->onRoles("web");
 
- //
- // Test whether or not that revision requested is actually available in version control.
- //
+//
+// Test whether or not that revision requested is actually available in version control.
+//
 
- task("test:revision", function() {
+task("test:revision", function() {
 	within("{{ cachePath }}", function() {
 		switch(get("vcsType")) {
 			case "git":
@@ -253,7 +253,7 @@ set("release", "{{ stage }}/{{ commit }}");
 				break;
 		}
 	});
- })->onRoles("files");
+})->onRoles("files");
 
 task("test:setup", function() {
 	if (test("ls {{ releasePath }}/{{ stage }}") && !input()->getOption("force")) {
@@ -262,15 +262,15 @@ task("test:setup", function() {
 	}
 })->onRoles("files");
 
- /***************************************************************************************************
-  ** Version Control Tasks
-  **************************************************************************************************/
+/***************************************************************************************************
+ ** Version Control Tasks
+ **************************************************************************************************/
 
- //
- // Exports from version control to a release.
- //
+//
+// Exports from version control to a release.
+//
 
- task("vcs:checkout", function() {
+task("vcs:checkout", function() {
 	if (!file_exists(parse("{{ releasePath }}/{{ release }}"))) { // TODO: This won't work like we think
 			run("mkdir -p {{ releasePath }}/{{ release }}");
 	}
@@ -281,13 +281,17 @@ task("test:setup", function() {
 				return run("{{ vcs }} archive {{ commit }} | tar -x --directory {{ releasePath }}/{{ release }}");
 		}
 	});
- })->onRoles("files");
+})->onRoles("files");
 
- //
- // Exports from version control to a stage's shares.
- //
 
- task("vcs:persist", function() {
+ta
+
+
+//
+// Exports from version control to a stage's shares.
+//
+
+task("vcs:persist", function() {
 	within("{{ cachePath }}", function() {
 		$shares = array_unique(array_merge(
 			get("config")["share"] ?? array(),
@@ -304,17 +308,17 @@ task("test:setup", function() {
 				break;
 		}
 	});
- })->onRoles("files");
+})->onRoles("files");
 
- /***************************************************************************************************
-  ** Database Tasks
-  **************************************************************************************************/
+/***************************************************************************************************
+ ** Database Tasks
+ **************************************************************************************************/
 
- //
- //
- //
+//
+//
+//
 
- task("db:create", function() {
+task("db:create", function() {
 	switch(get("dbType")) {
 		case "pgsql":
 			if (test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
@@ -332,11 +336,11 @@ task("test:setup", function() {
 	//
 	// TODO: Throw error that new database still exists
 	//
- })->onRoles("data");
+})->onRoles("data");
 
- //
- //
- //
+//
+//
+//
 
 task("db:export", function() {
 	if (!input()->hasOption("output")) {
@@ -358,11 +362,11 @@ task("db:export", function() {
 	}
 })->onRoles("data");
 
- //
- //
- //
+//
+//
+//
 
- task("db:import", function() {
+task("db:import", function() {
 	if (!input()->hasOption("input")) {
 		exit(2);
 	}
@@ -385,13 +389,13 @@ task("db:export", function() {
 	if (file_exists($file)) { // TODO: This won't work like we think
 		runLocally("rm $file");
 	}
- })->onRoles("data");
+})->onRoles("data");
 
- //
- //
- //
+//
+//
+//
 
- task("db:rollout", function() {
+task("db:rollout", function() {
 	switch(get("dbType")) {
 		case "pgsql":
 			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new");
@@ -417,23 +421,24 @@ task("db:export", function() {
 	//
 	// TODO:  throw error that there is no new DB to roll out
 	//
- })->onRoles("data");
+})->onRoles("data");
 
- /***************************************************************************************************
-  ** Deployment Tasks
-  **************************************************************************************************/
+/***************************************************************************************************
+ ** Deployment Tasks
+ **************************************************************************************************/
 
- task("setup", [
+task("setup", [
 	"test:setup",
 	"setup:cache",
 	"setup:releases",
 	"setup:shares",
 	"setup:stages",
 	"vcs:persist",
-	"db:create"
- ]);
+	"db:create",
+	"db:rollout"
+]);
 
- task("setup:cache", function() {
+task("setup:cache", function() {
 	switch(get("vcsType")) {
 		case "git":
 			if (!file_exists(parse("{{ cachePath }}/HEAD"))) { // TODO: This won't work like we think
@@ -441,29 +446,29 @@ task("db:export", function() {
 			}
 			break;
 	}
- })->onRoles("files");
+})->onRoles("files");
 
- task("setup:releases", function() {
+task("setup:releases", function() {
 	if (!file_exists(parse("{{ releasePath }}/{{ stage }}"))) { // TODO: This won't work like we think
 		run("mkdir -p {{ releasePath }}/{{ stage }}");
 	}
- })->onRoles("files");
+})->onRoles("files");
 
- task("setup:shares", function() {
+task("setup:shares", function() {
 	if (!file_exists(parse("{{ sharesPath }}/{{ stage }}"))) { // TODO: This won't work like we think
 		run("mkdir -p {{ sharesPath }}/{{ stage }}");
 	}
- })->onRoles("files");
+})->onRoles("files");
 
- task("setup:stages", function() {
+task("setup:stages", function() {
 	if (!file_exists(get("stagesPath"))) { // TODO: This won't work like we think
 		run("mkdir {{ stagesPath }}");
 	}
- })->onRoles("web");
+})->onRoles("web");
 
 /***************************************************************************************************
- ** Deployment Tasks
- **************************************************************************************************/
+** Deployment Tasks
+**************************************************************************************************/
 
 task("to", [
 	"test:release",
