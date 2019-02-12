@@ -224,8 +224,8 @@ set("source", function() {
 set("release", "{{ stage }}/{{ commit }}");
 
 set("current", function($result = NULL) {
-	foreach (roles('web') as $host) {
-		if ($host->get('stage', get('stage'))) {
+	foreach (roles("web") as $host) {
+		if ($host->get("stage") == get("stage")) {
 			on($host, function() use (&$result) {
 				if (test("[ $(readlink {{ stagesPath }}/{{ stage }}) ]")) {
 					$result = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
