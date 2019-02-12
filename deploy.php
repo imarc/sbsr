@@ -216,63 +216,15 @@ set("source", function() {
 
 set("release", "{{ stage }}/{{ commit }}");
 
-//
-// Setup Tasks
-//
-
-task("setup", [
-	"setup:cache",
-	"setup:releases",
-	"setup:shares",
-	"setup:stages",
-]);
-
-task("setup:cache", function() {
-	switch(get("vcsType")) {
-		case "git":
-			if (!file_exists(parse("{{ cachePath }}/HEAD"))) {
-				run("{{ vcs }} clone --bare {{ vcsPath }} {{ cachePath }}");
-			}
-			break;
-	}
-})->onRoles("files");
-
-task("setup:releases", function() {
-	if (!file_exists(parse("{{ releasePath }}/{{ stage }}"))) {
-		run("mkdir -p {{ releasePath }}/{{ stage }}");
-	}
-})->onRoles("files");
-
-task("setup:shares", function() {
-	if (!file_exists(parse("{{ sharesPath }}/{{ stage }}"))) {
-		run("mkdir -p {{ sharesPath }}/{{ stage }}");
-	}
-})->onRoles("files");
-
-task("setup:stages", function() {
-	if (!file_exists(get("stagesPath"))) {
-		run("mkdir {{ stagesPath }}");
-	}
-})->onRoles("web");
-
 /***************************************************************************************************
- ** Deployment Tasks
+ ** Test Tasks
  **************************************************************************************************/
+ //
+ // Test whether or not the staged release already matches the revision.  We will only re-deploy
+ // the same revision if -F is provided to force rebuild, resync, etc.
+ //
 
-task("to", [
-	"test",
-	"prepare",
-	"share",
-	"build",
-	"sync",
-	"release"
-]);
-
-//
-// Test the current stage link on web to see if the requested revision is already deployed.
-//
-
-task("test", function() {
+ task("test:release", function() {
 	if (test("readlink {{ stagesPath }}/{{ stage }}")) {
 		$current_release = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
 
@@ -281,17 +233,13 @@ task("test", function() {
 			exit(2);
 		}
 	}
-})->onRoles("web");
+ })->onRoles("web");
 
-//
-//
-//
+ //
+ // Test whether or not that revision requested is actually available in version control.
+ //
 
-task("prepare", function() {
-	if (!file_exists(parse("{{ releasePath }}/{{ release }}"))) {
-			run("mkdir -p {{ releasePath }}/{{ release }}");
-	}
-
+ task("test:revision", function() {
 	within("{{ cachePath }}", function() {
 		switch(get("vcsType")) {
 			case "git":
@@ -302,15 +250,230 @@ task("prepare", function() {
 					exit(1);
 				}
 
-				run("{{ vcs }} archive {{ commit }} | tar -x --directory {{ releasePath }}/{{ release }}");
 				break;
 		}
 	});
+ })->onRoles("files");
+
+task("test:setup", function() {
+	if (test("ls {{ releasePath }}/{{ stage }}") && !input()->getOption("force")) {
+		writeln("<error>Stage {{ stage }} appears to already be set up, use -F to force.</error>");
+		exit(2);
+	}
 })->onRoles("files");
 
-//
-//
-//
+ /***************************************************************************************************
+  ** Version Control Tasks
+  **************************************************************************************************/
+
+ //
+ // Exports from version control to a release.
+ //
+
+ task("vcs:checkout", function() {
+	if (!file_exists(parse("{{ releasePath }}/{{ release }}"))) { // TODO: This won't work like we think
+			run("mkdir -p {{ releasePath }}/{{ release }}");
+	}
+
+	within("{{ cachePath }}", function() {
+		switch(get("vcsType")) {
+			case "git":
+				return run("{{ vcs }} archive {{ commit }} | tar -x --directory {{ releasePath }}/{{ release }}");
+		}
+	});
+ })->onRoles("files");
+
+ //
+ // Exports from version control to a stage's shares.
+ //
+
+ task("vcs:persist", function() {
+	within("{{ cachePath }}", function() {
+		$shares = array_unique(array_merge(
+			get("config")["share"] ?? array(),
+			get("config")[parse("share-{{ stage }}")] ?? array()
+		));
+
+		switch(get("vcsType")) {
+			case "git":
+				foreach ($shares as $share) {
+					if (test("{{ vcs }} cat-file -e {{ commit }}:$share")) {
+						run("{{ vcs }} archive {{ commit }} -- $share | tar -x --directory {{ sharesPath }}/{{ stage }}");
+					}
+				}
+				break;
+		}
+	});
+ })->onRoles("files");
+
+ /***************************************************************************************************
+  ** Database Tasks
+  **************************************************************************************************/
+
+ //
+ //
+ //
+
+ task("db:create", function() {
+	switch(get("dbType")) {
+		case "pgsql":
+			if (test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
+				if (!input()->getOption("force")) {
+					writeln("<error>Database {{ stage }}_{{ dbName }}_new already exists, use -F to force.</error>");
+					exit(2);
+				}
+
+				run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_new\" postgres");
+			}
+
+			return run("{{ db }} -c \"CREATE DATABASE {{ stage }}_{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
+	}
+
+	//
+	// TODO: Throw error that new database still exists
+	//
+ })->onRoles("data");
+
+ //
+ //
+ //
+
+task("db:export", function() {
+	if (!input()->hasOption("output")) {
+		exit(2);
+	}
+
+	$file = input()->getOption("output");
+
+	run("{{ db_dump }} {{ stage }}_{{ dbName }} > $file");
+
+	//
+	// If the file was not exported locally, it won"t exist and we"ll have to download
+	// it then remove it from the remote server.
+	//
+
+	if (!file_exists($file)) { // TODO: This won't work like we think
+		download($file, $file);
+		run("rm $file");
+	}
+})->onRoles("data");
+
+ //
+ //
+ //
+
+ task("db:import", function() {
+	if (!input()->hasOption("input")) {
+		exit(2);
+	}
+
+	if (!file_exists($file = input()->getOption("input"))) { // TODO: This won't work like we think
+		exit(2);
+	}
+
+	runLocally("{{ self }} db:create {{ stage }}");
+
+	upload($file, $file);
+	run("cat $file | {{ db }} {{ stage }}_{{ dbName }}_new");
+	run("rm $file");
+
+	//
+	// If the file still exists then it was uploaded and imported remotely, so we still want
+	// to remove it locally.
+	//
+
+	if (file_exists($file)) { // TODO: This won't work like we think
+		runLocally("rm $file");
+	}
+ })->onRoles("data");
+
+ //
+ //
+ //
+
+ task("db:rollout", function() {
+	switch(get("dbType")) {
+		case "pgsql":
+			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new");
+			$has_old_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_old");
+			$has_cur_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}");
+
+			if (!$has_new_db) {
+				break;
+			}
+
+			if ($has_cur_db) {
+				if ($has_old_db) {
+					run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_old\" postgres");
+				}
+
+				run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }} RENAME to {{ stage }}_{{ dbName }}_old\" postgres");
+			}
+
+			run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }}_new RENAME to {{ stage }}_{{ dbName }}\" postgres");
+			return TRUE;
+	}
+
+	//
+	// TODO:  throw error that there is no new DB to roll out
+	//
+ })->onRoles("data");
+
+ /***************************************************************************************************
+  ** Deployment Tasks
+  **************************************************************************************************/
+
+ task("setup", [
+	"test:setup",
+	"setup:cache",
+	"setup:releases",
+	"setup:shares",
+	"setup:stages",
+	"vcs:persist",
+	"db:create"
+ ]);
+
+ task("setup:cache", function() {
+	switch(get("vcsType")) {
+		case "git":
+			if (!file_exists(parse("{{ cachePath }}/HEAD"))) { // TODO: This won't work like we think
+				run("{{ vcs }} clone --bare {{ vcsPath }} {{ cachePath }}");
+			}
+			break;
+	}
+ })->onRoles("files");
+
+ task("setup:releases", function() {
+	if (!file_exists(parse("{{ releasePath }}/{{ stage }}"))) { // TODO: This won't work like we think
+		run("mkdir -p {{ releasePath }}/{{ stage }}");
+	}
+ })->onRoles("files");
+
+ task("setup:shares", function() {
+	if (!file_exists(parse("{{ sharesPath }}/{{ stage }}"))) { // TODO: This won't work like we think
+		run("mkdir -p {{ sharesPath }}/{{ stage }}");
+	}
+ })->onRoles("files");
+
+ task("setup:stages", function() {
+	if (!file_exists(get("stagesPath"))) { // TODO: This won't work like we think
+		run("mkdir {{ stagesPath }}");
+	}
+ })->onRoles("web");
+
+/***************************************************************************************************
+ ** Deployment Tasks
+ **************************************************************************************************/
+
+task("to", [
+	"test:release",
+	"test:revision",
+	"vcs:checkout",
+	"share",
+	"build",
+	"sync",
+	"release"
+]);
 
 task("share", function() {
 	$shares_path  = parse("{{ sharesPath }}/{{ stage }}");
@@ -445,110 +608,3 @@ task("release", function() {
 		}
 	});
 })->onRoles("web");
-
-
-/***************************************************************************************************
- ** Database Tasks
- **************************************************************************************************/
-
-//
-//
-//
-
-task("db:create", function() {
-	switch(get("dbType")) {
-		case "pgsql":
-			if (!run("{{ db }} -l | grep {{ stage }}_{{ dbName }}_new | wc -l")) {
-				return run("{{ db }} -c \"CREATE DATABASE {{ stage }}_{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
-			}
-	}
-
-	//
-	// TODO: Throw error that new database still exists
-	//
-})->onRoles("data");
-
-//
-//
-//
-
-task("db:export", function() {
-	if (!input()->hasOption("output")) {
-		exit(2);
-	}
-
-	$file = input()->getOption("output");
-
-	run("{{ db_dump }} {{ stage }}_{{ dbName }} > $file");
-
-	//
-	// If the file was not exported locally, it won"t exist and we"ll have to download
-	// it then remove it from the remote server.
-	//
-
-	if (!file_exists($file)) {
-		download($file, $file);
-		run("rm $file");
-	}
-})->onRoles("data");
-
-//
-//
-//
-
-task("db:import", function() {
-	if (!input()->hasOption("input")) {
-		exit(2);
-	}
-
-	if (!file_exists($file = input()->getOption("input"))) {
-		exit(2);
-	}
-
-	runLocally("{{ self }} db:create {{ stage }}");
-
-	upload($file, $file);
-	run("cat $file | {{ db }} {{ stage }}_{{ dbName }}_new");
-	run("rm $file");
-
-	//
-	// If the file still exists then it was uploaded and imported remotely, so we still want
-	// to remove it locally.
-	//
-
-	if (file_exists($file)) {
-		runLocally("rm $file");
-	}
-})->onRoles("data");
-
-//
-//
-//
-
-task("db:rollout", function() {
-	switch(get("dbType")) {
-		case "pgsql":
-			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new");
-			$has_old_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_old");
-			$has_cur_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}");
-
-			if (!$has_new_db) {
-				break;
-			}
-
-			if ($has_cur_db) {
-				if ($has_old_db) {
-					run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_old\" postgres");
-				}
-
-				run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }} RENAME to {{ stage }}_{{ dbName }}_old\" postgres");
-			}
-
-			run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }}_new RENAME to {{ stage }}_{{ dbName }}\" postgres");
-			return TRUE;
-	}
-
-	//
-	// TODO:  throw error that there is no new DB to roll out
-	//
-})->onRoles("data");
