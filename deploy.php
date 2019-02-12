@@ -78,11 +78,18 @@ set("pid", function() {
 });
 
 set("self", function() {
-	return $_SERVER["argv"][0] . (
-		input()->hasOption("file")
-			? sprintf(" --file=\"%s\" ", input()->getOption("file"))
-			: NULL
-	);
+	return $_SERVER["argv"][0]
+		. (
+			input()->hasOption("file")
+				? sprintf(" --file=\"%s\" ", input()->getOption("file"))
+				: NULL
+		)
+		. (
+			input()->hasOption("force")
+				? sprintf(" -F ")
+				: NULL
+		)
+	;
 });
 
 //
@@ -552,13 +559,8 @@ task("sync", function() {
 		return;
 	}
 
-	if (input()->getOption('force')) {
-		runLocally("{{ self }} db:export -F -O {{ source }}_{{ dbName }}.sql {{ source }}");
-		runLocally("{{ self }} db:import -F -I {{ source }}_{{ dbName }}.sql {{ stage }}");
-	} else {
-		runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}");
-		runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}");		
-	}
+	runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}");
+	runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}");
 
 	within("{{ sharesPath }}", function() {
 		$paths = array_unique(array_merge(
@@ -621,6 +623,7 @@ task("release", function() {
 	$link_root .= str_replace(implode("/", $path_parts) . "/", "", $release_path);
 
 	run("ln -fsn $link_root {{ stagesPath }}/{{ stage }}");
+
 	runLocally("{{ self }} db:rollout {{ stage }}");
 
 	//
