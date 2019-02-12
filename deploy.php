@@ -418,9 +418,9 @@ task("db:import", function() {
 task("db:rollout", function() {
 	switch(get("dbType")) {
 		case "pgsql":
-			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new)");
-			$has_old_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_old)");
-			$has_cur_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }})");
+			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new");
+			$has_old_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_old");
+			$has_cur_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}");
 
 			if (!$has_new_db) {
 				break;
