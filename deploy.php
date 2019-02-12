@@ -216,22 +216,29 @@ set("source", function() {
 
 set("release", "{{ stage }}/{{ commit }}");
 
+set("current", function($result = NULL) {
+	on(roles('web'), function() use (&$result) {
+		if (test("[ $(readlink {{ stagesPath }}/{{ stage }}) ]")) {
+			$result = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
+		}
+	});
+
+	return $result;
+});
+
 /***************************************************************************************************
-** Test Tasks
-**************************************************************************************************/
+ ** Test Tasks
+ **************************************************************************************************/
+
 //
 // Test whether or not the staged release already matches the revision.  We will only re-deploy
 // the same revision if -F is provided to force rebuild, resync, etc.
 //
 
 task("test:release", function() {
-	if (test("readlink {{ stagesPath }}/{{ stage }}")) {
-		$current_release = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
-
-		if ($current_release == parse("{{ commit }}") && !input()->getOption("force")) {
-			writeln("<error>Commit {{ commit }} is already deployed on {{ stage }}, use -F to force.</error>");
-			exit(2);
-		}
+	if (parse("{{ current }}") == parse("{{ commit }}") && !input()->getOption("force")) {
+		writeln("<error>Commit {{ commit }} is already deployed on {{ stage }}, use -F to force.</error>");
+		exit(2);
 	}
 })->onRoles("web");
 
@@ -255,8 +262,12 @@ task("test:revision", function() {
 	});
 })->onRoles("files");
 
+//
+//
+//
+
 task("test:setup", function() {
-	if (test("ls {{ releasePath }}/{{ stage }}") && !input()->getOption("force")) {
+	if (test("[ -e {{ releasePath }}/{{ stage }} ]") && !input()->getOption("force")) {
 		writeln("<error>Stage {{ stage }} appears to already be set up, use -F to force.</error>");
 		exit(2);
 	}
@@ -283,8 +294,18 @@ task("vcs:checkout", function() {
 	});
 })->onRoles("files");
 
+//
+//
+//
 
-
+task("vcs:diff", function() {
+	within("{{ cachePath }}", function() {
+		switch(get("vcsType")) {
+			case "git":
+				return writeln(run("{{ vcs }} log {{ current }}...{{ commit }}"));
+		}
+	});
+})->onRoles("files");
 
 //
 // Exports from version control to a stage's shares.
@@ -300,7 +321,7 @@ task("vcs:persist", function() {
 		switch(get("vcsType")) {
 			case "git":
 				foreach ($shares as $share) {
-					if (test("{{ vcs }} cat-file -e {{ commit }}:$share")) {
+					if (test("$({{ vcs }} cat-file -e {{ commit }}:$share)")) {
 						run("{{ vcs }} archive {{ commit }} -- $share | tar -x --directory {{ sharesPath }}/{{ stage }}");
 					}
 				}
@@ -397,9 +418,9 @@ task("db:import", function() {
 task("db:rollout", function() {
 	switch(get("dbType")) {
 		case "pgsql":
-			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new");
-			$has_old_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_old");
-			$has_cur_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}");
+			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new)");
+			$has_old_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_old)");
+			$has_cur_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }})");
 
 			if (!$has_new_db) {
 				break;
@@ -466,8 +487,8 @@ task("setup:stages", function() {
 })->onRoles("web");
 
 /***************************************************************************************************
-** Deployment Tasks
-**************************************************************************************************/
+ ** Deployment Tasks
+ **************************************************************************************************/
 
 task("to", [
 	"test:release",
@@ -570,7 +591,7 @@ task("release", function() {
 	//
 
 	within("{{ releasePath }}/{{ release }}", function() {
-		if (test("{{ php }} vendor/bin/phinx status")) {
+		if (test("$({{ php }} vendor/bin/phinx status)")) {
 			if (get("stage") != get("source")) {
 				run("{{ php }} vendor/bin/phinx migrate -c -e new");
 			} else {
