@@ -293,7 +293,7 @@ task("test:setup", function() {
 //
 
 task("vcs:checkout", function() {
-	if (test("[ -ne {{ releasePath }}/{{ release }} ]")) {
+	if (!test("[ -e {{ releasePath }}/{{ release }} ]")) {
 			run("mkdir -p {{ releasePath }}/{{ release }}");
 	}
 
@@ -490,7 +490,7 @@ task("setup", [
 task("setup:cache", function() {
 	switch(get("vcsType")) {
 		case "git":
-			if (test("[ -ne {{ cachePath }}/HEAD ]")) {
+			if (!test("[ -e {{ cachePath }}/HEAD ]")) {
 				run("{{ vcs }} clone --bare {{ vcsPath }} {{ cachePath }}");
 			}
 			break;
@@ -498,19 +498,19 @@ task("setup:cache", function() {
 })->onRoles("files");
 
 task("setup:releases", function() {
-	if (test("[ -ne {{ releasePath }}/{{ stage }} ]")) {
+	if (!test("[ -e {{ releasePath }}/{{ stage }} ]")) {
 		run("mkdir -p {{ releasePath }}/{{ stage }}");
 	}
 })->onRoles("files");
 
 task("setup:shares", function() {
-	if (test("[ -ne {{ sharesPath }}/{{ stage }} ]")) {
+	if (!test("[ -e {{ sharesPath }}/{{ stage }} ]")) {
 		run("mkdir -p {{ sharesPath }}/{{ stage }}");
 	}
 })->onRoles("files");
 
 task("setup:stages", function() {
-	if (test("[ -ne {{ stagesPath }} ]")) {
+	if (!test("[ -e {{ stagesPath }} ]")) {
 		run("mkdir {{ stagesPath }}");
 	}
 })->onRoles("web");
