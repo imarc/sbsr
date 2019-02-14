@@ -261,7 +261,7 @@ task("test:revision", function() {
 	within("{{ cachePath }}", function() {
 		switch(get("vcsType")) {
 			case "git":
-				run("{{ vcs }} fetch");
+				run("{{ vcs }} fetch --all");
 
 				if (run("{{ vcs }} cat-file -t {{ commit }}") != "commit") {
 					writeln("<error>Invalid revision \"{{ revision }}\" specified</error>");
@@ -491,7 +491,7 @@ task("setup:cache", function() {
 	switch(get("vcsType")) {
 		case "git":
 			if (!test("[ -e {{ cachePath }}/HEAD ]")) {
-				run("{{ vcs }} clone --bare {{ vcsPath }} {{ cachePath }}");
+				run("{{ vcs }} clone --mirror {{ vcsPath }} {{ cachePath }}");
 			}
 			break;
 	}
