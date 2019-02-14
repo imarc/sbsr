@@ -58,16 +58,10 @@ ln -s /home/deploy/sbsr/deploy.sh /usr/bin/dep
 
 ## Initializing a Deployment Space
 
-As root, ceate a directory for your deployments:
+As root, create a directory for your deployments:
 
 ```bash
 mkdir /var/www/example.com
-```
-
-Copy the SBSR `deploy.yml` example into it:
-
-```bash
-cp /home/deploy/sbsr/deploy.yml /var/www/example.com/
 ```
 
 Give your deploy user full domain over this fold directory.  It is strongly suggested that you use
@@ -79,18 +73,32 @@ setfacl -R -dm u:deploy:rwx /var/www/example.com
 setfacl -R -m u:deploy:rwx /var/www/example.com
 ```
 
-## Configuration
+Become the deployment user:
 
-Please see the heavily commented [deploy.yml](deploy.yml) file for configuration details and
-examples.
+```bash
+su - deploy
+```
 
-## Usage
+Enter the directory:
 
-### Setup
+```bash
+cd /var/www/example.com
+```
 
-Set up a stage.  Default stages are `dev`, `uat`, and `prod`.  Note that the stage must be added to
-the `deploy.yml` before it is considered valid.  Running setup will create the requisite directory
-structures only.
+Copy the SBSR `deploy.yml` example into it:
+
+```bash
+cp /home/deploy/sbsr/deploy.yml ./
+```
+
+Edit the config accordingly.  The `deploy.yml` example is heavily commented and explains each of
+the options in detail:
+
+```bash
+<editor> deploy.yml
+```
+
+Save and exit your editor.  You can now set up your stages:
 
 ```bash
 dep setup <stage>
@@ -102,9 +110,11 @@ Usually you will begin by setting up the production environment:
 dep setup prod
 ```
 
-This will create the requisite stage directories for `prod` and copy out any shares that exist in
-your version control repository to the shares directory for the stage.  If you have additional
-shares which are not part of the repository, you will need to create them manually.
+This will create the requisite stage directories for `prod`, copy out any shares that exist in
+your version control repository to the shares directory for the stage, and create/rollout a new
+database for the stage.
+
+## Usage
 
 ### Deployment
 
