@@ -525,7 +525,6 @@ task("setup:stages", function() {
 
 task("to", [
 	"test:release",
-	"test:revision",
 	"vcs:checkout",
 	"share",
 	"build",
