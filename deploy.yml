@@ -76,17 +76,55 @@ options:
   # Key: `branch` (optional) is the branch to deploy, default varies on vcs type, `master` for `git`
   branch: master
 
+#
+# Key: `share` (optional)
+#
+# A list of files/directories in the stage's shares which will be re-linked to the build.  Shares
+# are used for data and configurations that should persist between deployments.  Common entries
+# include the `.env` file, storage folders, and possibly session paths.  You can add additional
+# per stage shares by adding additional `share` sections suffixed by `-<stage>`.
+#
+
 share:
   - .env
-  - writable
+  - storage
+
+#
+# Key: `build` (optional)
+#
+# A list of commands which should be executed when building the release.  These commands will be
+# executed in the release directory that is currently being built.  Common entries include package
+# manager installations, asset building through gulp, webpack, etc.  Per stage build commands can
+# be added by creating additional `build` sections suffixed by `-<stage>`.
+#
 
 build:
   - npm install
   - gulp build
   - composer install
 
+#
+# Key: `sync` (optional)
+#
+# A list of files/directories in the stage's shares which will be synced to match the source
+# stage environment.  If the source for your `uat` stage is `prod`, for example, in addition to
+# syncing the database from `prod` down to `uat` upon deployment, these shares will also be synced
+# with the shares from that environment.  Additional per stage sync entries can be added by
+# creating `sync` sections suffixed by `-<stage>`.
+#
+
 sync:
   - writable
+
+#
+# Key: `release` (optional)
+#
+# A list of commands which should be executed when deployment finishes and the new code is finally
+# released.  These commands will be executed in from the stage path of the given stage, e.g.
+# `stages/prod`.  Common entries include restarting memory caches and/or removing file caches. For
+# example `rm -rf storage/cache/*`.  You can add additional per stage release commands by creating
+# `release` sections suffixed by `-<stage>`.
+#
 
 release:
   - sudo service php7.3-fpm restart
