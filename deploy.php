@@ -292,7 +292,6 @@ task("test:setup", function() {
 // Exports from version control to a release.
 //
 
-before("vcs:checkout", "test:revision");
 task("vcs:checkout", function() {
 	if (!test("[ -e {{ releasePath }}/{{ release }} ]")) {
 			run("mkdir -p {{ releasePath }}/{{ release }}");
@@ -306,12 +305,12 @@ task("vcs:checkout", function() {
 	});
 })->onRoles("files");
 
+before("vcs:checkout", "test:revision");
 
 //
 //
 //
 
-before("vcs:diff", "test:revision");
 task("vcs:diff", function() {
 	within("{{ cachePath }}", function() {
 		switch(get("vcsType")) {
@@ -328,11 +327,12 @@ task("vcs:diff", function() {
 	});
 })->onRoles("files");
 
+before("vcs:diff", "test:revision");
+
 //
 // Exports from version control to a stage's shares.
 //
 
-before("vcs:persist", "test:revision");
 task("vcs:persist", function() {
 	within("{{ cachePath }}", function() {
 		$shares = array_unique(array_merge(
@@ -351,6 +351,8 @@ task("vcs:persist", function() {
 		}
 	});
 })->onRoles("files");
+
+before("vcs:persist", "test:revision");
 
 /***************************************************************************************************
  ** Database Tasks
