@@ -627,9 +627,9 @@ task("release", function() {
 	within("{{ releasePath }}/{{ release }}", function() {
 		if (test("[ -x vendor/bin/phinx ]")) {
 			if (get("stage") != get("source")) {
-				run("{{ php }} vendor/bin/phinx migrate -e new");
+				run("{{ php }} vendor/bin/phinx migrate -e new", ["tty" => TRUE]);
 			} else {
-				run("{{ php }} vendor/bin/phinx migrate -e current");
+				run("{{ php }} vendor/bin/phinx migrate -e current", ["tty" => TRUE]);
 			}
 		}
 	});
