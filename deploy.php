@@ -625,11 +625,11 @@ task("release", function() {
 	//
 
 	within("{{ releasePath }}/{{ release }}", function() {
-		if (test("$({{ php }} vendor/bin/phinx status)")) {
+		if (test("[ -x vendor/bin/phinx ]")) {
 			if (get("stage") != get("source")) {
-				run("{{ php }} vendor/bin/phinx migrate -c -e new");
+				run("{{ php }} vendor/bin/phinx migrate -e new");
 			} else {
-				run("{{ php }} vendor/bin/phinx migrate -c -e current");
+				run("{{ php }} vendor/bin/phinx migrate -e current");
 			}
 		}
 	});
@@ -649,9 +649,8 @@ task("release", function() {
 
 	$link_root .= str_replace(implode("/", $path_parts) . "/", "", $release_path);
 
-	run("ln -fsn $link_root {{ stagesPath }}/{{ stage }}");
-
 	runLocally("{{ self }} db:rollout {{ stage }}");
+	run("ln -fsn $link_root {{ stagesPath }}/{{ stage }}");
 
 	//
 	// Run release commands

@@ -237,8 +237,15 @@ and `old`.
 
 include('vendor/autoload.php');
 
-$dotenv = new Dotenv\Dotenv(__DIR__);
-$dotenv->load();
+//
+// Test if .env exists.  We don't need it to create a migration, so this can fail in some cases
+// but we still want that functionality.
+//
+
+if (file_exists(__DIR__ . '/.env')) {
+	$dotenv = new Dotenv\Dotenv(__DIR__);
+	$dotenv->load();
+}
 
 return [
 	'paths' => [
