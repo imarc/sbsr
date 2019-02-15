@@ -534,23 +534,27 @@ task("to", [
 	"release"
 ]);
 
+//
+// The share task is responsible for re-linking shares to our release
+//
+
 task("share", function() {
-	$shares_path  = parse("{{ sharesPath }}/{{ stage }}");
-	$path_parts   = explode("/", parse("{{ releasePath }}/{{ release }}"));
-	$link_root    = NULL;
+	within("{{ releasePath }}/{{ release }}", function() {
+		$shares_path  = parse("{{ sharesPath }}/{{ stage }}");
+		$path_parts   = explode("/", parse("{{ releasePath }}/{{ release }}"));
+		$link_root    = NULL;
 
-	while (strpos($shares_path, implode("/", $path_parts) . "/") !== 0) {
-		array_pop($path_parts);
-		$link_root .= "../";
-	}
+		while (strpos($shares_path, implode("/", $path_parts) . "/") !== 0) {
+			array_pop($path_parts);
+			$link_root .= "../";
+		}
 
-	$link_root .= str_replace(implode("/", $path_parts) . "/", "", $shares_path);
-	$link_paths = array_unique(array_merge(
-		get("config")["share"] ?? array(),
-		get("config")[parse("share-{{ stage }}")] ?? array()
-	));
+		$link_root .= str_replace(implode("/", $path_parts) . "/", "", $shares_path);
+		$link_paths = array_unique(array_merge(
+			get("config")["share"] ?? array(),
+			get("config")[parse("share-{{ stage }}")] ?? array()
+		));
 
-	within("{{ releasePath }}/{{ release }}", function() use ($link_root, $link_paths) {
 		foreach ($link_paths as $path) {
 			run("rm -rf $path");
 			run("ln -s $link_root/$path $path");
@@ -559,7 +563,7 @@ task("share", function() {
 })->onRoles("files");
 
 //
-//
+// The build task is responsible for executing all the commands necessary to build our release.
 //
 
 task("build", function() {
@@ -635,7 +639,8 @@ task("release", function() {
 	});
 
 	//
-	//
+	// Create a relative link to our release path, rollout our database, and link the new release
+	// to the stage.
 	//
 
 	$release_path = parse("{{ releasePath }}/{{ release }}");
@@ -653,7 +658,7 @@ task("release", function() {
 	run("ln -fsn $link_root {{ stagesPath }}/{{ stage }}");
 
 	//
-	// Run release commands
+	// Run release commands from the stage
 	//
 
 	within("{{ stagesPath }}/{{ stage }}", function() {
