@@ -164,6 +164,10 @@ set("db", function() {
 	switch(get("dbType")) {
 		case "pgsql":
 			return sprintf("%s -U %s", locateBinaryPath("psql"), get("dbUser") ?: "postgres");
+
+		case "none":
+			return FALSE;
+
 		default:
 			writeln("<error>Unsupported DB {{ dbType }}</error>");
 			exit(2);
@@ -174,6 +178,9 @@ set("db_dump", function() {
 	switch(get("dbType")) {
 		case "pgsql":
 			return sprintf("%s -U %s", locateBinaryPath("pg_dump"), get("dbUser") ?: "postgres");
+
+		case "none":
+			return FALSE;
 	}
 });
 
@@ -368,6 +375,10 @@ task("db:drop", function() {
 			if (test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
 				return run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_new\" postgres");
 			}
+			break;
+
+		case "none":
+			break;
 	}
 })->onRoles("data");
 
@@ -385,6 +396,10 @@ task("db:create", function() {
 			if (!test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
 				return run("{{ db }} -c \"CREATE DATABASE {{ stage }}_{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
 			}
+			break;
+
+		case "none":
+			break;
 	}
 
 	writeln("<error>Database {{ stage }}_{{ dbName }}_new already exists, use -F to force.</error>");
@@ -471,6 +486,9 @@ task("db:rollout", function() {
 
 			run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }}_new RENAME to {{ stage }}_{{ dbName }}\" postgres");
 			return TRUE;
+
+		case "none":
+			return FALSE;
 	}
 
 	//
