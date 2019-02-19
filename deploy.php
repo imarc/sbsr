@@ -399,7 +399,7 @@ task("db:create", function() {
 			break;
 
 		case "none":
-			break;
+			return;
 	}
 
 	writeln("<error>Database {{ stage }}_{{ dbName }}_new already exists, use -F to force.</error>");
@@ -608,8 +608,10 @@ task("sync", function() {
 		return;
 	}
 
-	runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}");
-	runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}");
+	if (get("dbType") != "none") {
+		runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}");
+		runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}");
+	}
 
 	within("{{ sharesPath }}", function() {
 		$paths = array_unique(array_merge(
