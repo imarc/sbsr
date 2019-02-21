@@ -625,7 +625,7 @@ task("sync", function() {
 			}
 
 			if (is_dir(parse("{{ sharesPath }}/{{ source }}/$path"))) {
-				run("rsync -rlpgoD {{ source }}/$path {{ stage }}/");
+				run("rsync -rlpgoD {{ source }}/$path/ {{ stage }}/$path");
 
 			} elseif (is_file(parse("{{ sharesPath }}/{{ source }}/$path"))) {
 				run("cp {{ source }}/$path {{ stage }}/$path");
