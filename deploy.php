@@ -129,6 +129,10 @@ set("dbName", function() {
 	return parse(get("config")["db"]["name"] ?? NULL);
 });
 
+set("dbHost", function() {
+	return parse(get("config")["db"]["host"] ?? NULL);
+});
+
 set("dbUser", function() {
 	return parse(get("config")["db"]["user"] ?? NULL);
 });
@@ -163,7 +167,12 @@ set("vcs", function() {
 set("db", function() {
 	switch(get("dbType")) {
 		case "pgsql":
-			return sprintf("%s -U %s", locateBinaryPath("psql"), get("dbUser") ?: "postgres");
+			return sprintf(
+				"%s -U %s %s",
+				locateBinaryPath("psql"),
+				get("dbUser") ?: "postgres",
+				get("dbHost") ? ("-h " . get("dbHost")) : NULL
+			);
 
 		case "none":
 			return FALSE;
@@ -177,7 +186,12 @@ set("db", function() {
 set("db_dump", function() {
 	switch(get("dbType")) {
 		case "pgsql":
-			return sprintf("%s -U %s", locateBinaryPath("pg_dump"), get("dbUser") ?: "postgres");
+			return sprintf(
+				"%s -U %s %s",
+				locateBinaryPath("pg_dump"),
+				get("dbUser") ?: "postgres",
+				get("dbHost") ? ("-h " . get("dbHost")) : NULL
+			);
 
 		case "none":
 			return FALSE;

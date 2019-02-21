@@ -34,7 +34,13 @@ db:
 
   # Key: `name` (required) the base name of the database, full database names will include stage
   # name and status, e.g. `dev_nmscpa_org`, `dev_nmscpa_org_old`
-  name: nmscpa_org
+  name: example_com
+
+
+  # Key: `host` (option) the host to connect to for DB operations.  Keep in mind that if you
+  # are using an inventory file or executing commands on a remote db host, this may be localhost
+  # or null (this can be counter-intuitive)
+  host:
 
   # Key: `role` (optional) the user role which owns newly created databases.  This should be equal
   # to the database user that connects from the application.  Defaults to `web` if undefined.
