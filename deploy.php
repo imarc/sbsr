@@ -174,6 +174,15 @@ set("db", function() {
 				get("dbHost") ? ("-h " . get("dbHost")) : NULL
 			);
 
+		case "mysql":
+			return sprintf(
+				"%s -u %s %s",
+				locateBinaryPath("mysql"),
+				get("dbUser") ?: "root",
+				get("dbHost") ? ("-h " . get("dbHost")) : NULL
+			);
+
+
 		case "none":
 			return FALSE;
 
@@ -190,6 +199,14 @@ set("db_dump", function() {
 				"%s -U %s %s",
 				locateBinaryPath("pg_dump"),
 				get("dbUser") ?: "postgres",
+				get("dbHost") ? ("-h " . get("dbHost")) : NULL
+			);
+
+		case "mysql":
+			return sprintf(
+				"%s -u %s %s --single-transaction",
+				locateBinaryPath("mysqldump"),
+				get("dbUser") ?: "root",
 				get("dbHost") ? ("-h " . get("dbHost")) : NULL
 			);
 
@@ -391,6 +408,12 @@ task("db:drop", function() {
 			}
 			break;
 
+		case "mysql":
+			if (test("{{ db }} -e \"exit\" {{ stage }}_{{ dbName }}_new")) {
+				return run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_new\" root");
+			}
+			break;
+
 		case "none":
 			break;
 	}
@@ -409,6 +432,14 @@ task("db:create", function() {
 		case "pgsql":
 			if (!test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
 				return run("{{ db }} -c \"CREATE DATABASE {{ stage }}_{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
+			}
+			break;
+
+		case "mysql":
+			if (!test("{{ db }} -c \"\exit\" {{ stage }}_{{ dbName }}_new")) {
+				run("{{ db }} -e \"CREATE DATABASE {{ stage }}_{{ dbName }}_new\"");
+				run("{{ db }} -e \"GRANT ALL PRIVILEGES ON {{ stage }}_{{ dbName }}_new.* TO {{ dbRole }}\"");
+				return;
 			}
 			break;
 
@@ -500,6 +531,43 @@ task("db:rollout", function() {
 
 			run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }}_new RENAME to {{ stage }}_{{ dbName }}\" postgres");
 			return TRUE;
+
+		case "mysql":
+			$new_db = "{{ stage }}_{{ dbName }}_new";
+			$old_db = "{{ stage }}_{{ dbName }}_old";
+			$cur_db = "{{ stage }}_{{ dbName }}";
+
+			$has_new_db = test("{{ db }} -e \"exit\" $new_db");
+			$has_old_db = test("{{ db }} -e \"exit\" $old_db");
+			$has_cur_db = test("{{ db }} -e \"exit\" $cur_db");
+
+			if (!$has_new_db) {
+				break;
+			}
+
+			if ($has_cur_db) {
+				if ($has_old_db) {
+					run("{{ db }} -e \"DROP DATABASE $old_db\"");
+				}
+
+				run("{{ db }} -e \"CREATE DATABASE $old_db\"");
+				run("{{ db }} -e \"GRANT ALL PRIVILEGES ON $old_db.* TO {{ dbRole }}\"");
+
+
+				$rename_command  = "{{ db }} $cur_db -sNe 'show tables' | while read table; ";
+				$rename_command .= "do {{ db }} -sNe \"RENAME TABLE $cur_db.\$table to $old_db.\$table\"; done";
+
+				run($rename_command);
+			}
+
+			$rename_command  = "{{ db }} $new_db -sNe 'show tables' | while read table; ";
+			$rename_command .= "do {{ db }} -sNe \"RENAME TABLE $new_db.\$table to $cur_db.\$table\"; done";
+
+			run($rename_command);
+			run("{{ db }} -e \"DROP DATABASE $new_db\"");
+
+			return TRUE;
+
 
 		case "none":
 			return FALSE;
