@@ -553,7 +553,6 @@ task("db:rollout", function() {
 				run("{{ db }} -e \"CREATE DATABASE $old_db\"");
 				run("{{ db }} -e \"GRANT ALL PRIVILEGES ON $old_db.* TO {{ dbRole }}\"");
 
-
 				$rename_command  = "{{ db }} $cur_db -sNe 'show tables' | while read table; ";
 				$rename_command .= "do {{ db }} -sNe \"RENAME TABLE $cur_db.\$table to $old_db.\$table\"; done";
 
