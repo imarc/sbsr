@@ -436,7 +436,7 @@ task("db:create", function() {
 			break;
 
 		case "mysql":
-			if (!test("{{ db }} -c \"\exit\" {{ stage }}_{{ dbName }}_new")) {
+			if (!test("{{ db }} -e \"exit\" {{ stage }}_{{ dbName }}_new")) {
 				run("{{ db }} -e \"CREATE DATABASE {{ stage }}_{{ dbName }}_new\"");
 				run("{{ db }} -e \"GRANT ALL PRIVILEGES ON {{ stage }}_{{ dbName }}_new.* TO {{ dbRole }}\"");
 				return;
