@@ -410,7 +410,7 @@ task("db:drop", function() {
 
 		case "mysql":
 			if (test("{{ db }} -e \"exit\" {{ stage }}_{{ dbName }}_new")) {
-				return run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_new\" root");
+				return run("{{ db }} -e \"DROP DATABASE {{ stage }}_{{ dbName }}_new\" root");
 			}
 			break;
 
