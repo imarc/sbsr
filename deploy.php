@@ -588,8 +588,12 @@ task("share", function() {
 		));
 
 		foreach ($link_paths as $path) {
+			$path = trim($path, '/');
+
+			$extra_root = str_repeat('../', substr_count($path, '/'));
+
 			run("rm -rf $path");
-			run("ln -s $link_root/$path $path");
+			run("ln -s $extra_root$link_root/$path $path");
 		}
 	});
 })->onRoles("files");
