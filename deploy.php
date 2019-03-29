@@ -557,7 +557,11 @@ task("db:rollout", function() {
 				$rename_command .= "do {{ db }} -sNe \"RENAME TABLE $cur_db.\$table to $old_db.\$table\"; done";
 
 				run($rename_command);
+				run("{{ db }} -e \"DROP DATABASE $cur_db\"");
 			}
+
+			run("{{ db }} -e \"CREATE DATABASE $cur_db\"");
+			run("{{ db }} -e \"GRANT ALL PRIVILEGES ON $cur_db.* TO {{ dbRole }}\"");
 
 			$rename_command  = "{{ db }} $new_db -sNe 'show tables' | while read table; ";
 			$rename_command .= "do {{ db }} -sNe \"RENAME TABLE $new_db.\$table to $cur_db.\$table\"; done";
@@ -566,7 +570,6 @@ task("db:rollout", function() {
 			run("{{ db }} -e \"DROP DATABASE $new_db\"");
 
 			return TRUE;
-
 
 		case "none":
 			return FALSE;
@@ -777,3 +780,4 @@ task("release", function() {
 		}
 	});
 })->onRoles("web");
+
