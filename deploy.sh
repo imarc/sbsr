@@ -8,7 +8,7 @@ EXEC="$ROOT/deploy.php"
 CONF="$ROOT/deploy.yml"
 
 if [[ `whoami` != $USER ]]; then
-	sudo -u $USER $DCMD --file=$EXEC  "$@"
+	sudo -u $USER $0 "$@"
 else
 	$DCMD --file=$EXEC "$@"
 fi
