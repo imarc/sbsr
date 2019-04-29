@@ -438,7 +438,11 @@ task("db:create", function() {
 		case "mysql":
 			if (!test("{{ db }} -e \"exit\" {{ stage }}_{{ dbName }}_new")) {
 				run("{{ db }} -e \"CREATE DATABASE {{ stage }}_{{ dbName }}_new\"");
-				run("{{ db }} -e \"GRANT ALL PRIVILEGES ON {{ stage }}_{{ dbName }}_new.* TO {{ dbRole }}\"");
+
+				if (parse('{{ dbRole }}') != parse('{{ dbUser }}')) {
+					run("{{ db }} -e \"GRANT ALL PRIVILEGES ON {{ stage }}_{{ dbName }}_new.* TO {{ dbRole }}\"");
+				}
+				
 				return;
 			}
 			break;
