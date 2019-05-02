@@ -338,7 +338,7 @@ task("vcs:checkout", function() {
 	within("{{ cachePath }}", function() {
 		switch(get("vcsType")) {
 			case "git":
-				return run("{{ vcs }} archive {{ commit }} | tar -x --directory {{ releasePath }}/{{ release }}");
+				return run("{{ vcs }} archive {{ commit }} | tar -x --no-overwrite-dir --directory {{ releasePath }}/{{ release }}");
 		}
 	});
 })->onRoles("files");
@@ -382,7 +382,7 @@ task("vcs:persist", function() {
 			case "git":
 				foreach ($shares as $share) {
 					if (test("$({{ vcs }} cat-file -e {{ commit }}:$share)")) {
-						run("{{ vcs }} archive {{ commit }} -- $share | tar -x --directory {{ sharesPath }}/{{ stage }}");
+						run("{{ vcs }} archive {{ commit }} -- $share | tar -x --no-overwrite-dir --directory {{ sharesPath }}/{{ stage }}");
 					}
 				}
 				break;
