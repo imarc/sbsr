@@ -26,6 +26,12 @@ Deploying to a stage:
 dep to <stage>
 ```
 
+If deployment fails it may be the case that the current release available is already deployed, or that a previous deployment failed or was interrupted.  SBSR will try to explain as best it can why the deployment failed and usually suggest to use the `-F` option to force deployment.
+
+```bash
+dep to <stage> -F
+```
+
 ### Database
 
 Create a new database for the stage.  This will create a database such as `<stage>_<db.name>_new`
