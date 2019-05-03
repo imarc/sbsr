@@ -8,7 +8,7 @@ tasks which can be customized via a simple YAML configuration.
 
 If you're looking for how to install, skip to [installing](#installing).
 
-**NOTE: All usage commands must be executed in the project folder where deployment was setup (the location of the `deploy.yml` file).  At current, you cannot specify to deploy a specific site from another location.**
+> _**NOTE: All usage commands must be executed in the project folder where deployment was setup (the location of the `deploy.yml` file).  At current, you cannot specify to deploy a specific site from another location.**_
 
 ### Deployment
 
