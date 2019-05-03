@@ -71,7 +71,7 @@ will need to roll it out to replace the current database.
 To export a database, run:
 
 ```bash
-dep db:import -O <file> <stage>
+dep db:export -O <file> <stage>
 ```
 
 ## Installing
