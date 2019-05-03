@@ -2,7 +2,13 @@ SBSR (Share, Build, Sync, Release) is a generic web application deployment recip
 configuration that works with [deployer](https://deployer.org/).  It uses a common workflow and
 tasks which can be customized via a simple YAML configuration.
 
+## Requirements
 
+It is assumed you have the following installed:
+
+- Git
+- PHP (Deployer Compatible Version)
+- Composer
 
 ## Usage
 
@@ -61,16 +67,6 @@ To export a database, run:
 ```bash
 dep db:import -O <file> <stage>
 ```
-
-
-
-## Requirements
-
-It is assumed you have the following installed:
-
-- Git
-- PHP (Deployer Compatible Version)
-- Composer
 
 ## Installing
 
