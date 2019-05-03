@@ -4,6 +4,64 @@ tasks which can be customized via a simple YAML configuration.
 
 
 
+## Usage
+
+If you're looking for how to install, skip to [installing](#installing).
+
+> NOTE: All usage commands must be executed in the project folder where deployment was setup (the location of the `deploy.yml` file).  At current, you cannot specify to deploy a specific site from another location.
+
+### Deployment
+
+Deploying to a stage:
+
+```bash
+dep to <stage>
+```
+
+### Database
+
+Create a new database for the stage.  This will create a database such as `<stage>_<db.name>_new`
+which:
+
+```bash
+dep db:create <stage>
+```
+
+You can now run whatever manual operations you need to on the database.  If you make a mistake you
+can drop the new database:
+
+```bash
+dep db:drop <stage>
+```
+> Note: that this will only drop the new database.  Once a database is rolled out, there's no way
+using SBSR to remove it.  You can only ever roll out a new database in its place.
+
+If all your operations were run successfully, you can roll out the new database to the current:
+
+```bash
+dep db:rollout <stage>
+```
+
+> Note: This will move `<stage>_<db.name>`, if it exists, to `<stage>_<db.name>_old` and move the
+new `<stage>_<db.name>_new` to `<stage>_<db.name>`, basically cycling the databases.
+
+If you want to import a database you can execute the following:
+
+```bash
+dep db:import -I <file> <stage>
+```
+
+This will create a new database, and execute the SQL found in `<file>`.  Keep in mind you still
+will need to roll it out to replace the current database.
+
+To export a database, run:
+
+```bash
+dep db:import -O <file> <stage>
+```
+
+
+
 ## Requirements
 
 It is assumed you have the following installed:
@@ -114,57 +172,7 @@ This will create the requisite stage directories for `prod`, copy out any shares
 your version control repository to the shares directory for the stage, and create/rollout a new
 database for the stage.
 
-## Usage
 
-### Deployment
-
-Deploying to a stage:
-
-```bash
-dep to <stage>
-```
-
-### Database
-
-Create a new database for the stage.  This will create a database such as `<stage>_<db.name>_new`
-which:
-
-```bash
-dep db:create <stage>
-```
-
-You can now run whatever manual operations you need to on the database.  If you make a mistake you
-can drop the new database:
-
-```bash
-dep db:drop <stage>
-```
-> Note: that this will only drop the new database.  Once a database is rolled out, there's no way
-using SBSR to remove it.  You can only ever roll out a new database in its place.
-
-If all your operations were run successfully, you can roll out the new database to the current:
-
-```bash
-dep db:rollout <stage>
-```
-
-> Note: This will move `<stage>_<db.name>`, if it exists, to `<stage>_<db.name>_old` and move the
-new `<stage>_<db.name>_new` to `<stage>_<db.name>`, basically cycling the databases.
-
-If you want to import a database you can execute the following:
-
-```bash
-dep db:import -I <file> <stage>
-```
-
-This will create a new database, and execute the SQL found in `<file>`.  Keep in mind you still
-will need to roll it out to replace the current database.
-
-To export a database, run:
-
-```bash
-dep db:import -O <file> <stage>
-```
 
 ## Concepts
 
