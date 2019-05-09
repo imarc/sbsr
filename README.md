@@ -14,9 +14,8 @@ It is assumed you have the following installed:
 
 If you're looking for how to install, skip to [installing](#installing).
 
-### NOTE
 
-> _**All usage commands must be executed in the project folder where deployment was setup (the location of the `deploy.yml` file).  At current, you cannot specify to deploy a specific site from another location.**_
+> Note: All usage commands must be executed in the project folder where deployment was setup (the location of the `deploy.yml` file).  At current, you cannot specify to deploy a specific site from another location.
 
 ### Deployment
 
@@ -73,6 +72,24 @@ To export a database, run:
 ```bash
 dep db:export -O <file> <stage>
 ```
+
+#### Syncing
+
+Using the above import / export examples you can sync a database from any environment to any other environment.  To sync the database from `prod` to `dev` for example, you can run:
+
+```bash
+dep db:export -O prod.sql prod
+dep db:import -I prod.sql dev
+```
+
+Alternatively, if you just want to sync a database from the configured source, you can just run:
+
+```bash
+dep sync <stage>
+```
+
+> NOTE: The `sync` command will also sync any shares that have been configured to sync from the source, so it is not only going to copy the database but also file storage.
+
 
 ## Installing
 
