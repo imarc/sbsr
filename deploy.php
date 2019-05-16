@@ -785,3 +785,19 @@ task("release", function() {
 	});
 })->onRoles("web");
 
+
+task("prune", function() {
+	within("{{ releasePath }}/{{ stage }}", function() {
+		$list = explode("\n", run("ls -1c"));
+		$live = basename(run("readlink {{ stagesPath }}/{{ stage }}"));
+
+		unset($list[array_search($live, $list)]);
+
+		foreach ($list as $release) {
+			if ($release) {
+				writeln("Removing release: $release");
+				run("rm -rf {{ releasePath }}/{{ stage }}/$release");
+			}
+		}
+	});
+})->onRoles("files");
