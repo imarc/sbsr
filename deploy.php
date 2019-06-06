@@ -637,7 +637,8 @@ task("to", [
 	"share",
 	"build",
 	"sync",
-	"release"
+	"release",
+	"prune"
 ]);
 
 //
