@@ -684,7 +684,7 @@ task("build", function() {
 		));
 
 		foreach ($commands as $command) {
-			run($command, ["tty" => TRUE]);
+			run($command);
 		}
 	});
 })->onRoles("files");
@@ -743,9 +743,9 @@ task("release", function() {
 	within("{{ releasePath }}/{{ release }}", function() {
 		if (test("[ -x vendor/bin/phinx ]")) {
 			if (get("stage") != get("source")) {
-				run("{{ php }} vendor/bin/phinx migrate -e new", ["tty" => TRUE]);
+				run("{{ php }} vendor/bin/phinx migrate -e new");
 			} else {
-				run("{{ php }} vendor/bin/phinx migrate -e current", ["tty" => TRUE]);
+				run("{{ php }} vendor/bin/phinx migrate -e current");
 			}
 		}
 	});
@@ -780,7 +780,7 @@ task("release", function() {
 		));
 
 		foreach ($commands as $command) {
-			run($command, ["tty" => TRUE]);
+			run($command);
 		}
 	});
 })->onRoles("web");
