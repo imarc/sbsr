@@ -718,7 +718,9 @@ task("sync", function() {
 			}
 
 			if (is_dir(parse("{{ sharesPath }}/{{ source }}/$path"))) {
-				run("rsync -rlD {{ source }}/$path/ {{ stage }}/$path");
+				run("rsync -rlD {{ source }}/$path/ {{ stage }}/$path", [
+					'timeout' => null
+				]);
 
 			} elseif (is_file(parse("{{ sharesPath }}/{{ source }}/$path"))) {
 				run("cp {{ source }}/$path {{ stage }}/$path");
