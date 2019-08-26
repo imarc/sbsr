@@ -10,10 +10,31 @@ use Symfony\Component\Console\Input\InputArgument;
 // Extended Config
 //
 
-if (file_exists("deploy.yml")) {
-	set("config", Yaml::parseFile("deploy.yml"));
+if (file_exists(__DIR__ . "/conf.yml")) {
+	set("config", Yaml::parseFile(__DIR__ . "/conf.yml"));
 } else {
 	set("config", []);
+}
+
+$config_whitelist = get("config")["whitelist"] ?? [];
+$config_realpath  = realpath("deploy.yml");
+$config_is_safe   = FALSE;
+
+if (file_exists($config_realpath)) {
+	if (!count($config_whitelist)) {
+		$config_is_safe = TRUE;
+	} elseif (in_array(dirname($config_realpath), $config_whitelist)) {
+		$config_is_safe = TRUE;
+	} elseif (in_array(dirname(dirname($config_realpath)), $config_whitelist)) {
+		$config_is_safe = TRUE;
+	}
+
+	if (!$config_is_safe) {
+		echo 'Insecure configuration, please whitelist the execution path or the parent.' . PHP_EOL;
+		exit(1);
+	}
+
+	set("config", Yaml::parseFile($config_realpath) + get("config"));
 }
 
 //
@@ -442,7 +463,7 @@ task("db:create", function() {
 				if (parse('{{ dbRole }}') != parse('{{ dbUser }}')) {
 					run("{{ db }} -e \"GRANT ALL PRIVILEGES ON {{ stage }}_{{ dbName }}_new.* TO {{ dbRole }}\"");
 				}
-				
+
 				return;
 			}
 			break;
