@@ -765,7 +765,7 @@ task("release", function() {
 	//
 
 	within("{{ releasePath }}/{{ release }}", function() {
-		if (test("[ -x vendor/bin/phinx ]")) {
+		if (get("dbType") != 'none' && test("[ -x vendor/bin/phinx ]")) {
 			if (get("stage") != get("source")) {
 				run("{{ php }} vendor/bin/phinx migrate -e new");
 			} else {
