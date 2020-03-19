@@ -536,11 +536,15 @@ task("db:import", function() {
 //
 
 task("db:rollout", function() {
+	$new_db = "{{ stage }}_{{ dbName }}_new";
+	$old_db = "{{ stage }}_{{ dbName }}_old";
+	$cur_db = "{{ stage }}_{{ dbName }}";
+
 	switch(get("dbType")) {
 		case "pgsql":
-			$has_new_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_new");
-			$has_old_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}_old");
-			$has_cur_db = test("{{ db }} -c \"\q\" {{ stage }}_{{ dbName }}");
+			$has_new_db = test("{{ db }} -c \"\q\" $new_db");
+			$has_old_db = test("{{ db }} -c \"\q\" $old_db");
+			$has_cur_db = test("{{ db }} -c \"\q\" $cur_db");
 
 			if (!$has_new_db) {
 				break;
@@ -548,20 +552,84 @@ task("db:rollout", function() {
 
 			if ($has_cur_db) {
 				if ($has_old_db) {
-					run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_old\" postgres");
+					run("{{ db }} -c \"DROP DATABASE $old_db\" postgres");
 				}
 
-				run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }} RENAME to {{ stage }}_{{ dbName }}_old\" postgres");
+				run("{{ db }} -c \"ALTER DATABASE $cur_db RENAME to $old_db\" postgres");
 			}
 
-			run("{{ db }} -c \"ALTER DATABASE {{ stage }}_{{ dbName }}_new RENAME to {{ stage }}_{{ dbName }}\" postgres");
+			run("{{ db }} -c \"ALTER DATABASE $new_db RENAME to $cur_db\" postgres");
 			return TRUE;
 
 		case "mysql":
-			$new_db = "{{ stage }}_{{ dbName }}_new";
-			$old_db = "{{ stage }}_{{ dbName }}_old";
-			$cur_db = "{{ stage }}_{{ dbName }}";
+			$has_new_db = test("{{ db }} -e \"exit\" $new_db");
+			$has_old_db = test("{{ db }} -e \"exit\" $old_db");
+			$has_cur_db = test("{{ db }} -e \"exit\" $cur_db");
 
+			if (!$has_new_db) {
+				break;
+			}
+
+			if ($has_cur_db) {
+				if ($has_old_db) {
+					run("{{ db }} -e \"DROP DATABASE $old_db\"");
+				}
+
+				run("{{ db }} -e \"CREATE DATABASE $old_db\"");
+				run("{{ db }} -e \"GRANT ALL PRIVILEGES ON $old_db.* TO {{ dbRole }}\"");
+
+				$rename_command  = "{{ db }} $cur_db -sNe 'show tables' | while read table; ";
+				$rename_command .= "do {{ db }} -sNe \"RENAME TABLE $cur_db.\$table to $old_db.\$table\"; done";
+
+				run($rename_command);
+				run("{{ db }} -e \"DROP DATABASE $cur_db\"");
+			}
+
+			run("{{ db }} -e \"CREATE DATABASE $cur_db\"");
+			run("{{ db }} -e \"GRANT ALL PRIVILEGES ON $cur_db.* TO {{ dbRole }}\"");
+
+			$rename_command  = "{{ db }} $new_db -sNe 'show tables' | while read table; ";
+			$rename_command .= "do {{ db }} -sNe \"RENAME TABLE $new_db.\$table to $cur_db.\$table\"; done";
+
+			run($rename_command);
+			run("{{ db }} -e \"DROP DATABASE $new_db\"");
+
+			return TRUE;
+
+		case "none":
+			return FALSE;
+	}
+
+	//
+	// TODO:  throw error that there is no new DB to roll out
+	//
+})->onRoles("data");
+
+//
+//
+//
+
+task("db:rollback", function() {
+	$new_db = "{{ stage }}_{{ dbName }}_new";
+	$old_db = "{{ stage }}_{{ dbName }}_old";
+	$cur_db = "{{ stage }}_{{ dbName }}";
+
+	switch(get("dbType")) {
+		case "pgsql":
+			$has_old_db = test("{{ db }} -c \"\q\" $old_db");
+			$has_cur_db = test("{{ db }} -c \"\q\" $cur_db");
+
+			if ($has_old_db) {
+				if ($has_cur_db) {
+					run("{{ db }} -c \"DROP DATABASE $cur_db\" postgres");
+				}
+
+				run("{{ db }} -c \"ALTER DATABASE $old_db RENAME to $cur_db\" postgres");
+			}
+
+			return TRUE;
+
+		case "mysql":
 			$has_new_db = test("{{ db }} -e \"exit\" $new_db");
 			$has_old_db = test("{{ db }} -e \"exit\" $old_db");
 			$has_cur_db = test("{{ db }} -e \"exit\" $cur_db");
@@ -761,21 +829,21 @@ task("sync", function() {
 
 task("release", function() {
 	//
-	// Run migrations
+	// Roll out the new database and run migrations
 	//
 
+	runLocally("{{ self }} db:rollout {{ stage }}");
+
 	within("{{ releasePath }}/{{ release }}", function() {
-		if (get("dbType") != 'none' && test("[ -x vendor/bin/phinx ]")) {
-			if (get("stage") != get("source")) {
-				run("{{ php }} vendor/bin/phinx migrate -e new");
-			} else {
-				run("{{ php }} vendor/bin/phinx migrate -e current");
+		if (!empty(get("options")["migrate"])) {
+			foreach ((array) get("options")["migrate"] as $migrate_cmd) {
+				run($migrate_cmd, ['tty' => TRUE]);
 			}
 		}
 	});
 
 	//
-	// Create a relative link to our release path, rollout our database, and link the new release
+	// Create a relative link to our release path and link the new release
 	// to the stage.
 	//
 
@@ -790,7 +858,6 @@ task("release", function() {
 
 	$link_root .= str_replace(implode("/", $path_parts) . "/", "", $release_path);
 
-	runLocally("{{ self }} db:rollout {{ stage }}");
 	run("ln -fsn $link_root {{ stagesPath }}/{{ stage }}");
 
 	//

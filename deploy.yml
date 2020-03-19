@@ -82,6 +82,9 @@ options:
   # Key: `branch` (optional) is the branch to deploy, default varies on vcs type, `master` for `git`
   branch: master
 
+  # Migration command
+  migrate: null
+
 #
 # Key: `share` (optional)
 #
