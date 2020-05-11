@@ -85,6 +85,9 @@ options:
   # Migration command
   migrate: null
 
+  # Timeout
+  timeout: 500
+
 #
 # Key: `share` (optional)
 #

@@ -774,7 +774,9 @@ task("build", function() {
 		));
 
 		foreach ($commands as $command) {
-			run($command);
+			run($command, [
+				'timeout' => get("options")["timeout"] ?? 500
+			]);
 		}
 	});
 })->onRoles("files");
