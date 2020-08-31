@@ -839,7 +839,7 @@ task("release", function() {
 	within("{{ releasePath }}/{{ release }}", function() {
 		if (!empty(get("options")["migrate"])) {
 			foreach ((array) get("options")["migrate"] as $migrate_cmd) {
-				run($migrate_cmd, ['tty' => TRUE]);
+				run($migrate_cmd);
 			}
 		}
 	});
