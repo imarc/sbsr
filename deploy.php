@@ -252,9 +252,27 @@ set("revision", function() {
 });
 
 set("commit", function() {
+	$rev = get("revision");
+
+	if (strpos($rev, "=") === 0) {
+		$stage = substr($rev, 1);
+		$rev   = NULL;
+
+		foreach (roles("web") as $host) {
+			if ($host->get("stage") != $stage) {
+				continue;
+			}
+
+			on($host, function() use (&$rev, $stage) {
+				if (test("[ $(readlink {{ stagesPath }}/$stage) ]")) {
+					$rev = basename(run("readlink {{ stagesPath }}/$stage"));
+				}
+			});
+		}
+	}
+
 	switch (get("vcsType")) {
 		case "git":
-			$rev  = get("revision");
 			$refs = run("{{ vcs }} ls-remote {{ vcsPath }}");
 
 			foreach (explode("\n", $refs) as $ref) {
@@ -265,9 +283,10 @@ set("commit", function() {
 					break;
 				}
 			}
-
-			return $rev;
+			break;
 	}
+
+	return $rev;
 });
 
 set("source", function() {
@@ -306,6 +325,11 @@ set("current", function($result = NULL) {
 //
 
 task("test:release", function() {
+	if (empty(get("commit"))) {
+		writeln("<error>Could not resolve revision \"{{ revision }}\" to a specific commit.</error>");
+		exit(2);
+	}
+
 	if (parse("{{ current }}") == parse("{{ commit }}") && !input()->getOption("force")) {
 		writeln("<error>Commit {{ commit }} is already deployed on {{ stage }}, use -F to force.</error>");
 		exit(2);
@@ -809,7 +833,7 @@ task("sync", function() {
 			}
 
 			if (is_dir(parse("{{ sharesPath }}/{{ source }}/$path"))) {
-				run("rsync -rlD {{ source }}/$path/ {{ stage }}/$path", [
+				run("rsync -rlW --delete {{ source }}/$path/ {{ stage }}/$path", [
 					'timeout' => null
 				]);
 
