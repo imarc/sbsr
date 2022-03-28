@@ -511,7 +511,9 @@ task("db:export", function() {
 
 	$file = input()->getOption("output");
 
-	run("{{ db_dump }} {{ stage }}_{{ dbName }} > $file");
+	run("{{ db_dump }} {{ stage }}_{{ dbName }} > $file", [
+		'timeout' => null
+	]);
 
 	//
 	// If the file was not exported locally, it won"t exist and we"ll have to download
@@ -542,7 +544,11 @@ task("db:import", function() {
 	invoke("db:create");
 
 	upload($file, $file);
-	run("cat $file | {{ db }} {{ stage }}_{{ dbName }}_new");
+
+	run("cat $file | {{ db }} {{ stage }}_{{ dbName }}_new", [
+		'timeout' => null
+	]);
+
 	run("rm $file");
 
 	//
@@ -817,8 +823,13 @@ task("sync", function() {
 	}
 
 	if (get("dbType") != "none") {
-		runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}");
-		runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}");
+		runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}", [
+			'timeout' => null
+		]);
+
+		runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}", [
+			'timeout' => null
+		]);
 	}
 
 	within("{{ sharesPath }}", function() {
