@@ -844,7 +844,7 @@ task("sync", function() {
 			}
 
 			if (is_dir(parse("{{ sharesPath }}/{{ source }}/$path"))) {
-				run("rsync -rlW --delete --ignore-missing-args {{ source }}/$path/ {{ stage }}/$path", [
+				run("rsync -qrlW --delete --ignore-missing-args {{ source }}/$path/ {{ stage }}/$path", [
 					'timeout' => null
 				]);
 
