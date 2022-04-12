@@ -4,7 +4,7 @@ namespace Deployer;
 
 use Symfony\Component\Yaml\Yaml;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 
 //
 // Extended Config
@@ -844,9 +844,15 @@ task("sync", function() {
 			}
 
 			if (is_dir(parse("{{ sharesPath }}/{{ source }}/$path"))) {
-				run("rsync -qrlW --delete --ignore-missing-args {{ source }}/$path/ {{ stage }}/$path", [
-					'timeout' => null
-				]);
+				try {
+					run("rsync -qrlW --delete --ignore-missing-args {{ source }}/$path/ {{ stage }}/$path", [
+						'timeout' => null
+					]);
+				} catch (ProcessFailedException $e) {
+					if ($e->getProcess()->getExitCode() != 24) {
+						throw $e;
+					}
+				}
 
 			} elseif (is_file(parse("{{ sharesPath }}/{{ source }}/$path"))) {
 				run("cp {{ source }}/$path {{ stage }}/$path");
