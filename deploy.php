@@ -845,9 +845,17 @@ task("sync", function() {
 
 			if (is_dir(parse("{{ sharesPath }}/{{ source }}/$path"))) {
 				try {
-					run("rsync -qrlW --delete --ignore-missing-args {{ source }}/$path/ {{ stage }}/$path", [
-						'timeout' => null
-					]);
+					if (is_file(parse("{{ sharesPath }}/deploy.exc"))) {
+						run("rsync -rlW --delete --ignore-missing-args --exclude-from=deploy.exc {{ source }}/$path/ {{ stage }}/$path", [
+							'timeout' => null
+						]);
+
+					} else {
+						run("rsync -qrlW --delete --ignore-missing-args {{ source }}/$path/ {{ stage }}/$path", [
+							'timeout' => null
+						]);
+					}
+
 				} catch (ProcessFailedException $e) {
 					if ($e->getProcess()->getExitCode() != 24) {
 						throw $e;
