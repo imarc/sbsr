@@ -73,10 +73,15 @@ if (file_exists("hosts.yml")) {
 // Initialization
 //
 
-set("env", get("config")["env"] ?? []);
-
-set("stage", function() {
+set("stage", function () {
 	return input()->getArgument("stage");
+});
+
+set("env", function() {
+	return array_merge(
+		get("config")["env"] ?? array(),
+		get("config")[parse("env-{{ stage }}")] ?? array()
+	);
 });
 
 set("options", function() {
@@ -148,6 +153,14 @@ set("dbType", function() {
 
 set("dbName", function() {
 	return parse(get("config")["db"]["name"] ?? NULL);
+});
+
+set("dbPrefix", function() {
+	return parse(get("config")["db"]["prefix"] ?? (
+		get("dbName") == get("config")["db"]["name"]
+			? '{{ stage }}_'
+			: NULL
+	));
 });
 
 set("dbHost", function() {
@@ -448,14 +461,14 @@ before("vcs:persist", "test:revision");
 task("db:drop", function() {
 	switch(get("dbType")) {
 		case "pgsql":
-			if (test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
-				return run("{{ db }} -c \"DROP DATABASE {{ stage }}_{{ dbName }}_new\" postgres");
+			if (test("{{ db }} -c \"\\q\" {{ dbPrefix }}{{ dbName }}_new")) {
+				return run("{{ db }} -c \"DROP DATABASE {{ dbPrefix }}{{ dbName }}_new\" postgres");
 			}
 			break;
 
 		case "mysql":
-			if (test("{{ db }} -e \"exit\" {{ stage }}_{{ dbName }}_new")) {
-				return run("{{ db }} -e \"DROP DATABASE {{ stage }}_{{ dbName }}_new\"");
+			if (test("{{ db }} -e \"exit\" {{ dbPrefix }}{{ dbName }}_new")) {
+				return run("{{ db }} -e \"DROP DATABASE {{ dbPrefix }}{{ dbName }}_new\"");
 			}
 			break;
 
@@ -475,17 +488,17 @@ task("db:create", function() {
 
 	switch(get("dbType")) {
 		case "pgsql":
-			if (!test("{{ db }} -c \"\\q\" {{ stage }}_{{ dbName }}_new")) {
-				return run("{{ db }} -c \"CREATE DATABASE {{ stage }}_{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
+			if (!test("{{ db }} -c \"\\q\" {{ dbPrefix }}{{ dbName }}_new")) {
+				return run("{{ db }} -c \"CREATE DATABASE {{ dbPrefix }}{{ dbName }}_new OWNER {{ dbRole }}\" postgres");
 			}
 			break;
 
 		case "mysql":
-			if (!test("{{ db }} -e \"exit\" {{ stage }}_{{ dbName }}_new")) {
-				run("{{ db }} -e \"CREATE DATABASE {{ stage }}_{{ dbName }}_new\"");
+			if (!test("{{ db }} -e \"exit\" {{ dbPrefix }}{{ dbName }}_new")) {
+				run("{{ db }} -e \"CREATE DATABASE {{ dbPrefix }}{{ dbName }}_new\"");
 
 				if (parse('{{ dbRole }}') != parse('{{ dbUser }}')) {
-					run("{{ db }} -e \"GRANT ALL PRIVILEGES ON {{ stage }}_{{ dbName }}_new.* TO {{ dbRole }}\"");
+					run("{{ db }} -e \"GRANT ALL PRIVILEGES ON {{ dbPrefix }}{{ dbName }}_new.* TO {{ dbRole }}\"");
 				}
 
 				return;
@@ -496,7 +509,7 @@ task("db:create", function() {
 			return;
 	}
 
-	writeln("<error>Database {{ stage }}_{{ dbName }}_new already exists, use -F to force.</error>");
+	writeln("<error>Database {{ dbPrefix }}{{ dbName }}_new already exists, use -F to force.</error>");
 	exit(2);
 })->onRoles("data");
 
@@ -511,7 +524,7 @@ task("db:export", function() {
 
 	$file = input()->getOption("output");
 
-	run("{{ db_dump }} {{ stage }}_{{ dbName }} > $file", [
+	run("{{ db_dump }} {{ dbPrefix }}{{ dbName }} > $file", [
 		'timeout' => null
 	]);
 
@@ -545,7 +558,7 @@ task("db:import", function() {
 
 	upload($file, $file);
 
-	run("cat $file | {{ db }} {{ stage }}_{{ dbName }}_new", [
+	run("cat $file | {{ db }} {{ dbPrefix }}{{ dbName }}_new", [
 		'timeout' => null
 	]);
 
@@ -566,9 +579,9 @@ task("db:import", function() {
 //
 
 task("db:rollout", function() {
-	$new_db = "{{ stage }}_{{ dbName }}_new";
-	$old_db = "{{ stage }}_{{ dbName }}_old";
-	$cur_db = "{{ stage }}_{{ dbName }}";
+	$new_db = "{{ dbPrefix }}{{ dbName }}_new";
+	$old_db = "{{ dbPrefix }}{{ dbName }}_old";
+	$cur_db = "{{ dbPrefix }}{{ dbName }}";
 
 	switch(get("dbType")) {
 		case "pgsql":
@@ -640,9 +653,9 @@ task("db:rollout", function() {
 //
 
 task("db:rollback", function() {
-	$new_db = "{{ stage }}_{{ dbName }}_new";
-	$old_db = "{{ stage }}_{{ dbName }}_old";
-	$cur_db = "{{ stage }}_{{ dbName }}";
+	$new_db = "{{ dbPrefix }}{{ dbName }}_new";
+	$old_db = "{{ dbPrefix }}{{ dbName }}_old";
+	$cur_db = "{{ dbPrefix }}{{ dbName }}";
 
 	switch(get("dbType")) {
 		case "pgsql":
