@@ -901,7 +901,9 @@ task("release", function() {
 	within("{{ releasePath }}/{{ release }}", function() {
 		if (!empty(get("options")["migrate"])) {
 			foreach ((array) get("options")["migrate"] as $migrate_cmd) {
-				run($migrate_cmd);
+				run($migrate_cmd, [
+					'timeout' => null
+				]);
 			}
 		}
 	});
@@ -935,7 +937,9 @@ task("release", function() {
 		));
 
 		foreach ($commands as $command) {
-			run($command);
+			run($command, [
+				'timeout' => get("options")["timeout"] ?? 500
+			]);
 		}
 	});
 })->onRoles("web");
