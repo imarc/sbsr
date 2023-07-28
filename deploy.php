@@ -91,6 +91,16 @@ set("options", function() {
 	);
 });
 
+set("source", function () {
+	if (input()->getOption("source")) {
+		return input()->getOption("source");
+	} elseif (!empty(get("options")["source"])) {
+		return get("options")["source"];
+	} else {
+		return "prod";
+	}
+});
+
 //
 // Runtime
 //
@@ -160,6 +170,13 @@ set("dbPrefix", function() {
 		get("dbName") == get("config")["db"]["name"]
 			? '{{ stage }}_'
 			: NULL
+	));
+});
+
+set("dbSourcePrefix", function () {
+	return parse(get("config")["db"]["prefix"] ?? (get("dbName") == get("config")["db"]["name"]
+		? '{{ source }}_'
+		: NULL
 	));
 });
 
@@ -300,16 +317,6 @@ set("commit", function() {
 	}
 
 	return $rev;
-});
-
-set("source", function() {
-	if (input()->getOption("source")) {
-		return input()->getOption("source");
-	} elseif (!empty(get("options")["source"])) {
-		return get("options")["source"];
-	} else {
-		return "prod";
-	}
 });
 
 set("release", "{{ stage }}/{{ commit }}");
@@ -503,6 +510,59 @@ task("db:create", function() {
 
 				return;
 			}
+			break;
+
+		case "none":
+			return;
+	}
+
+	writeln("<error>Database {{ dbPrefix }}{{ dbName }}_new already exists, use -F to force.</error>");
+	exit(2);
+})->onRoles("data");
+
+//
+//
+//
+
+task("db:dupe", function () {
+	if (input()->getOption('force')) {
+		invoke("db:drop");
+	}
+
+	switch (get("dbType")) {
+		case "pgsql":
+			if (!test("{{ db }} -c \"\\q\" {{ dbPrefix }}{{ dbName }}_new")) {
+				$dst = parse("{{ dbPrefix }}{{ dbName }}_new");
+				$src = parse("{{ dbSourcePrefix }}{{ dbName }}");
+
+				run("{{ db }} -c \"CREATE DATABASE $dst TEMPLATE $src OWNER {{ dbRole }}\" postgres");
+
+				return;
+			}
+
+			break;
+
+		case "mysql":
+			if (!test("{{ db }} -e \"exit\" {{ dbPrefix }}{{ dbName }}_new")) {
+				run("{{ db }} -e \"CREATE DATABASE {{ dbPrefix }}{{ dbName }}_new\"");
+
+				$tables = run("{{ db }} -B -e \"SHOW TABLES FROM {{ dbSourcePrefix }}{{ dbName }}\"");
+
+				foreach (preg_split("/\r\n|\n|\r/", $tables) as $table) {
+					$dst = parse("{{ dbPrefix }}{{ dbName }}_new.$table");
+					$src = parse("{{ dbSourcePrefix }}{{ dbName }}.$table");
+
+					run("{{ db }} -E \"CREATE TABLE $dst LIKE $src\"");
+					run("{{ db }} -E \"INSERT INTO $dst SELECT * FROM $src\"");
+				}
+
+				if (parse('{{ dbRole }}') != parse('{{ dbUser }}')) {
+					run("{{ db }} -e \"GRANT ALL PRIVILEGES ON {{ dbPrefix }}{{ dbName }}_new.* TO {{ dbRole }}\"");
+				}
+
+				return;
+			}
+
 			break;
 
 		case "none":
@@ -836,13 +896,7 @@ task("sync", function() {
 	}
 
 	if (get("dbType") != "none") {
-		runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}", [
-			'timeout' => null
-		]);
-
-		runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}", [
-			'timeout' => null
-		]);
+		runLocally("{{ self }} db:dupe {{ stage }} -S {{ source }}");
 	}
 
 	within("{{ sharesPath }}", function() {
