@@ -535,7 +535,9 @@ task("db:dupe", function () {
 				$dst = parse("{{ dbPrefix }}{{ dbName }}_new");
 				$src = parse("{{ dbSourcePrefix }}{{ dbName }}");
 
-				run("{{ db }} -c \"CREATE DATABASE $dst TEMPLATE $src OWNER {{ dbRole }}\" postgres");
+				run("{{ db }} -c \"CREATE DATABASE $dst TEMPLATE $src OWNER {{ dbRole }}\" postgres", [
+					'timeout' => null
+				]);
 
 				return;
 			}
@@ -553,7 +555,9 @@ task("db:dupe", function () {
 					$src = parse("{{ dbSourcePrefix }}{{ dbName }}.$table");
 
 					run("{{ db }} -E \"CREATE TABLE $dst LIKE $src\"");
-					run("{{ db }} -E \"INSERT INTO $dst SELECT * FROM $src\"");
+					run("{{ db }} -E \"INSERT INTO $dst SELECT * FROM $src\"", [
+						'timeout' => null
+					]);
 				}
 
 				if (parse('{{ dbRole }}') != parse('{{ dbUser }}')) {
