@@ -900,7 +900,7 @@ task("sync", function() {
 	}
 
 	if (get("dbType") != "none") {
-		if (get("options")["sync"] ?? 'transfer' == 'transfer') {
+		if ((get("options")["sync"] ?? 'transfer') == 'transfer') {
 			runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}", [
 				'timeout' => null
 			]);
