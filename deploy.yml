@@ -85,6 +85,9 @@ options:
   # Migration command
   migrate: null
 
+  # Sync method, options are 'dupe' vs. 'transfer'
+  sync: transfer
+
   # Timeout
   timeout: 500
 

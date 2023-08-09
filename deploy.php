@@ -900,7 +900,20 @@ task("sync", function() {
 	}
 
 	if (get("dbType") != "none") {
-		runLocally("{{ self }} db:dupe {{ stage }} -S {{ source }}");
+		if (get("options")["sync"] ?? 'transfer' == 'transfer') {
+			runLocally("{{ self }} db:export -O {{ source }}_{{ dbName }}.sql {{ source }}", [
+				'timeout' => null
+			]);
+
+			runLocally("{{ self }} db:import -I {{ source }}_{{ dbName }}.sql {{ stage }}", [
+				'timeout' => null
+			]);
+
+		} else {
+			runLocally("{{ self }} db:dupe {{ stage }} -S {{ source }}", [
+				'timeout' => null
+			]);
+		}
 	}
 
 	within("{{ sharesPath }}", function() {
